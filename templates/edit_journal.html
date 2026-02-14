@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Edit Reflection – Breaking Procrastination Paralysis</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <!-- fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500&family=Lora:ital,wght@0,400;0,500;1,400&display=swap"
+        rel="stylesheet"
+    >
+
+    <!-- design system -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='calm.css') }}">
+</head>
+
+<body>
+<div class="page-wrapper">
+
+    <!-- navigation -->
+    <nav class="page-nav">
+        <a href="{{ url_for('dashboard') }}" class="nav-brand">Breaking Procrastination Paralysis</a>
+        <ul class="nav-links">
+            <li><a href="{{ url_for('dashboard') }}">Today</a></li>
+            <li><a href="{{ url_for('journal') }}" class="active">Reflect</a></li>
+            <li><a href="{{ url_for('habits') }}">Tiny Steps</a></li>
+            <li><a href="{{ url_for('analytics') }}">Patterns</a></li>
+            <li><a href="{{ url_for('logout') }}" class="logout-link">Log out</a></li>
+        </ul>
+    </nav>
+
+    <!-- main content -->
+    <main class="page-content">
+
+        <div class="section-header fade-in-up">
+            <h1 class="section-title">Edit reflection</h1>
+            <p class="section-subtitle">
+                Update your words. The system will re-read the emotion when you save.
+            </p>
+        </div>
+
+        <form method="post" class="fade-in-up">
+            <div class="form-group">
+                <label for="entry_text" class="form-label">Your reflection</label>
+                <textarea
+                    id="entry_text"
+                    name="entry_text"
+                    rows="6"
+                >{{ entry["entry_text"] }}</textarea>
+            </div>
+            <button type="submit" class="btn-calm">Save changes</button>
+            <a href="{{ url_for('journal') }}" class="btn-text" style="margin-left: 16px;">Cancel</a>
+        </form>
+
+    </main>
+
+</div>
+
+<!-- cursor glow effect -->
+<div class="cursor-glow" id="cursorGlow"></div>
+<script>
+(function() {
+    const glow = document.getElementById('cursorGlow');
+    if (!glow || window.innerWidth < 768) return;
+
+    let mouseX = -300, mouseY = -300;
+    let glowX = -300, glowY = -300;
+
+    document.addEventListener('mousemove', function(e) {
+        mouseX = e.clientX;
+        mouseY = e.clientY;
+    });
+
+    function animate() {
+        glowX += (mouseX - glowX) * 0.12;
+        glowY += (mouseY - glowY) * 0.12;
+        glow.style.left = glowX + 'px';
+        glow.style.top = glowY + 'px';
+        requestAnimationFrame(animate);
+    }
+    animate();
+})();
+</script>
+</body>
+</html>

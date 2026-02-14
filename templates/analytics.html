@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Patterns – Breaking Procrastination Paralysis</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <!-- fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500&family=Lora:ital,wght@0,400;0,500;1,400&display=swap"
+        rel="stylesheet"
+    >
+
+    <!-- design system -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='calm.css') }}">
+</head>
+
+<body>
+<div class="page-wrapper">
+
+    <!-- navigation -->
+    <nav class="page-nav">
+        <a href="{{ url_for('dashboard') }}" class="nav-brand">Breaking Procrastination Paralysis</a>
+        <ul class="nav-links">
+            <li><a href="{{ url_for('dashboard') }}">Today</a></li>
+            <li><a href="{{ url_for('journal') }}">Reflect</a></li>
+            <li><a href="{{ url_for('habits') }}">Tiny Steps</a></li>
+            <li><a href="{{ url_for('analytics') }}" class="active">Patterns</a></li>
+            <li><a href="{{ url_for('logout') }}" class="logout-link">Log out</a></li>
+        </ul>
+    </nav>
+
+    <!-- main content -->
+    <main class="page-content">
+
+        <!-- section header -->
+        <div class="section-header fade-in-up">
+            <h1 class="section-title">Notice Patterns</h1>
+            <p class="section-subtitle">
+                Gentle insights from your journaling and habit activity.
+                These are not judgements — just observations to help you understand yourself.
+            </p>
+        </div>
+
+        <!-- activity overview -->
+        <div class="patterns-grid stagger-children">
+
+            <div class="card pattern-card">
+                <p class="pattern-value">{{ active_days }}</p>
+                <p class="pattern-label">Days you reflected this week</p>
+            </div>
+
+            <div class="card pattern-card">
+                <p class="pattern-value">{{ habits_done }}</p>
+                <p class="pattern-label">Tiny actions completed this week</p>
+            </div>
+
+        </div>
+
+        <!-- emotion distribution -->
+        <div class="card fade-in-up">
+            <h2>Emotional landscape</h2>
+            <p class="section-subtitle" style="margin-bottom: 20px;">
+                How your emotions have shown up across your reflections.
+            </p>
+
+            {% if emotion_data %}
+            <ul class="emotion-bar-list">
+                {% set max_count = emotion_data | map(attribute='count') | max %}
+                {% for row in emotion_data %}
+                <li class="emotion-bar-item">
+                    <span class="emotion-bar-name">{{ row["predicted_emotion"] }}</span>
+                    <div class="emotion-bar-track">
+                        <div
+                            class="emotion-bar-fill {{ row['predicted_emotion'] if row['predicted_emotion'] in ['overwhelmed', 'anxious', 'stuck', 'stressed', 'tired', 'calm'] else 'default' }}"
+                            style="width: {{ (row['count'] / max_count * 100) | round }}%;"
+                        ></div>
+                    </div>
+                    <span class="emotion-bar-count">{{ row["count"] }}</span>
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <p class="empty-state">
+                Emotion patterns will appear here after your first few reflections.
+            </p>
+            {% endif %}
+        </div>
+
+        <div style="margin-top: 40px;">
+            <a href="{{ url_for('dashboard') }}" class="btn-text">Return to your space</a>
+        </div>
+
+    </main>
+
+</div>
+
+<!-- cursor glow effect -->
+<div class="cursor-glow" id="cursorGlow"></div>
+<script>
+(function() {
+    const glow = document.getElementById('cursorGlow');
+    if (!glow || window.innerWidth < 768) return;
+
+    let mouseX = -300, mouseY = -300;
+    let glowX = -300, glowY = -300;
+
+    document.addEventListener('mousemove', function(e) {
+        mouseX = e.clientX;
+        mouseY = e.clientY;
+    });
+
+    function animate() {
+        glowX += (mouseX - glowX) * 0.12;
+        glowY += (mouseY - glowY) * 0.12;
+        glow.style.left = glowX + 'px';
+        glow.style.top = glowY + 'px';
+        requestAnimationFrame(animate);
+    }
+    animate();
+})();
+</script>
+</body>
+</html>

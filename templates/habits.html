@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Tiny Steps – Breaking Procrastination Paralysis</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <!-- fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500&family=Lora:ital,wght@0,400;0,500;1,400&display=swap"
+        rel="stylesheet"
+    >
+
+    <!-- design system -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='calm.css') }}">
+</head>
+
+<body>
+<div class="page-wrapper">
+
+    <!-- navigation -->
+    <nav class="page-nav">
+        <a href="{{ url_for('dashboard') }}" class="nav-brand">Breaking Procrastination Paralysis</a>
+        <ul class="nav-links">
+            <li><a href="{{ url_for('dashboard') }}">Today</a></li>
+            <li><a href="{{ url_for('journal') }}">Reflect</a></li>
+            <li><a href="{{ url_for('habits') }}" class="active">Tiny Steps</a></li>
+            <li><a href="{{ url_for('analytics') }}">Patterns</a></li>
+            <li><a href="{{ url_for('logout') }}" class="logout-link">Log out</a></li>
+        </ul>
+    </nav>
+
+    <!-- main content -->
+    <main class="page-content">
+
+        <!-- section header -->
+        <div class="section-header fade-in-up">
+            <h1 class="section-title">Tiny Steps</h1>
+            <p class="section-subtitle">
+                Small steps are still steps forward.
+                These are gentle, realistic actions that support who you are becoming.
+            </p>
+        </div>
+
+        <!-- today's habits -->
+        <form method="post" class="fade-in-up">
+            <h2>Today's gentle reminders</h2>
+
+            {% if habits %}
+            <ul class="habit-list">
+                {% for h in habits %}
+                <li class="habit-item">
+                    <input
+                        class="habit-checkbox"
+                        type="checkbox"
+                        name="completed_habits"
+                        value="{{ h['id'] }}"
+                        id="habit-{{ h['id'] }}"
+                    >
+                    <label class="habit-label" for="habit-{{ h['id'] }}">
+                        {{ h["name"] }}
+                        {% if h["is_sample"] %}
+                            <span class="habit-tag">suggestion</span>
+                        {% endif %}
+                    </label>
+                </li>
+                {% endfor %}
+            </ul>
+            <button type="submit" class="btn-calm">Acknowledge progress</button>
+            {% else %}
+            <p class="empty-state">No tiny steps yet. Add one below when you feel ready.</p>
+            {% endif %}
+        </form>
+
+        <hr class="divider">
+
+        <!-- add a new habit -->
+        <div class="fade-in-up">
+            <h2>Add a tiny action</h2>
+            <p class="section-subtitle" style="margin-bottom: 16px;">
+                What feels manageable today? It can be something very small.
+            </p>
+
+            <form method="post">
+                <div class="add-habit-wrapper">
+                    <input
+                        type="text"
+                        name="new_habit"
+                        placeholder="Open my laptop and spend 2 minutes planning tomorrow..."
+                    >
+                    <button class="btn-gentle" type="submit">Add</button>
+                </div>
+                <p class="form-hint">
+                    This can be any small action that feels realistic for you right now.
+                </p>
+            </form>
+        </div>
+
+        <div style="margin-top: 40px;">
+            <a href="{{ url_for('dashboard') }}" class="btn-text">Return to your space</a>
+        </div>
+
+    </main>
+
+</div>
+
+<!-- cursor glow effect -->
+<div class="cursor-glow" id="cursorGlow"></div>
+<script>
+(function() {
+    const glow = document.getElementById('cursorGlow');
+    if (!glow || window.innerWidth < 768) return;
+
+    let mouseX = -300, mouseY = -300;
+    let glowX = -300, glowY = -300;
+
+    document.addEventListener('mousemove', function(e) {
+        mouseX = e.clientX;
+        mouseY = e.clientY;
+    });
+
+    function animate() {
+        glowX += (mouseX - glowX) * 0.12;
+        glowY += (mouseY - glowY) * 0.12;
+        glow.style.left = glowX + 'px';
+        glow.style.top = glowY + 'px';
+        requestAnimationFrame(animate);
+    }
+    animate();
+})();
+</script>
+</body>
+</html>

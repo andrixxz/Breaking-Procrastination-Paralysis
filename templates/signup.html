@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Sign Up – Breaking Procrastination Paralysis</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <!-- fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500&family=Lora:ital,wght@0,400;0,500;1,400&display=swap"
+        rel="stylesheet"
+    >
+
+    <!-- design system -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='calm.css') }}">
+</head>
+
+<body>
+<div class="auth-wrapper">
+
+    <div class="auth-container">
+
+        <div class="auth-header">
+            <h1 class="auth-title">Begin your journey</h1>
+            <p class="auth-subtitle">Create an account to start building gentle habits.</p>
+        </div>
+
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+            <div class="auth-flash">
+                {% for message in messages %}
+                <p>{{ message }}</p>
+                {% endfor %}
+            </div>
+            {% endif %}
+        {% endwith %}
+
+        <form method="post" class="auth-form">
+
+            <div class="form-group">
+                <label for="username" class="form-label">Choose a username</label>
+                <input
+                    type="text"
+                    id="username"
+                    name="username"
+                    required
+                    autofocus
+                    placeholder="At least 3 characters"
+                >
+            </div>
+
+            <div class="form-group">
+                <label for="password" class="form-label">Create a password</label>
+                <input
+                    type="password"
+                    id="password"
+                    name="password"
+                    required
+                    placeholder="At least 6 characters"
+                >
+            </div>
+
+            <div class="form-group">
+                <label for="confirm_password" class="form-label">Confirm password</label>
+                <input
+                    type="password"
+                    id="confirm_password"
+                    name="confirm_password"
+                    required
+                    placeholder="Type your password again"
+                >
+            </div>
+
+            <button type="submit" class="btn-calm btn-auth-submit">Sign up</button>
+
+        </form>
+
+        <div class="auth-footer">
+            <p>
+                Already have an account?
+                <a href="{{ url_for('login') }}" class="auth-link">Log in</a>
+            </p>
+            <p>
+                <a href="{{ url_for('landing') }}" class="auth-link-subtle">Back to home</a>
+            </p>
+        </div>
+
+    </div>
+
+</div>
+
+<!-- cursor glow -->
+<div class="cursor-glow" id="cursorGlow"></div>
+<script>
+(function() {
+    var glow = document.getElementById('cursorGlow');
+    if (!glow || window.innerWidth < 768) return;
+
+    var mouseX = -300, mouseY = -300;
+    var glowX = -300, glowY = -300;
+
+    document.addEventListener('mousemove', function(e) {
+        mouseX = e.clientX;
+        mouseY = e.clientY;
+    });
+
+    function animate() {
+        glowX += (mouseX - glowX) * 0.12;
+        glowY += (mouseY - glowY) * 0.12;
+        glow.style.left = glowX + 'px';
+        glow.style.top = glowY + 'px';
+        requestAnimationFrame(animate);
+    }
+    animate();
+})();
+</script>
+</body>
+</html>

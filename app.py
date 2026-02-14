@@ -1,18 +1,21 @@
-from flask import Flask, render_template, request, redirect, url_for
+from flask import Flask, render_template, request, redirect, url_for, session, flash
 import sqlite3
 import joblib
 import os
 from datetime import datetime, date, timedelta
+from werkzeug.security import generate_password_hash, check_password_hash
+from functools import wraps
 
 # creates flask app instance
 app = Flask(__name__)
+app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
 
 # file paths
 BASE_DIR = os.path.dirname(__file__)
 MODEL_DIR = os.path.join(BASE_DIR, "models") # where ML model + vectorizer are stored
 DB_PATH = os.path.join(BASE_DIR, "journal.db") # SQLite database
 
-# model file paths 
+# model file paths
 VECTORIZER_PATH = os.path.join(MODEL_DIR, "tfidf_vectorizer.pkl")
 MODEL_PATH = os.path.join(MODEL_DIR, "emotion_model.pkl")
 
@@ -35,37 +38,53 @@ def init_db():
     conn = get_db_connection()
     cur = conn.cursor()
 
-    # journal entries table
+    # users table
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        );
+    """)
+
+    # journal entries table (per user)
     cur.execute("""
         CREATE TABLE IF NOT EXISTS journal_entries (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
             entry_text TEXT NOT NULL,
             predicted_emotion TEXT NOT NULL,
-            created_at TEXT NOT NULL
+            created_at TEXT NOT NULL,
+            FOREIGN KEY (user_id) REFERENCES users(id)
         );
     """)
 
-    # alignment score + emotional streak (single row with id = 1)
+    # alignment score + emotional streak (per user)
     cur.execute("""
         CREATE TABLE IF NOT EXISTS alignment_state (
-            id INTEGER PRIMARY KEY CHECK (id = 1),
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER UNIQUE NOT NULL,
             alignment_score INTEGER NOT NULL,
             emotional_streak INTEGER NOT NULL,
-            last_journal_date TEXT
+            last_journal_date TEXT,
+            FOREIGN KEY (user_id) REFERENCES users(id)
         );
     """)
 
-    # habit list table
+    # habit list table (per user)
     cur.execute("""
         CREATE TABLE IF NOT EXISTS habits (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
             name TEXT NOT NULL,
             is_sample INTEGER NOT NULL DEFAULT 0,
-            created_at TEXT NOT NULL
+            created_at TEXT NOT NULL,
+            FOREIGN KEY (user_id) REFERENCES users(id)
         );
     """)
 
-    # record of when habits are completed 
+    # record of when habits are completed
     cur.execute("""
         CREATE TABLE IF NOT EXISTS habit_completions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -75,36 +94,61 @@ def init_db():
         );
     """)
 
-     # create starting values if empty
-    cur.execute("SELECT COUNT(*) AS cnt FROM alignment_state;")
-    row = cur.fetchone()
-    if row["cnt"] == 0:
-        cur.execute(
-            "INSERT INTO alignment_state (id, alignment_score, emotional_streak, last_journal_date) "
-            "VALUES (1, 0, 0, NULL);"
-        )
+    conn.commit()
+    conn.close()
 
-    # add a few sample habits if none exist yet
-    cur.execute("SELECT COUNT(*) AS cnt FROM habits;")
-    row = cur.fetchone()
-    if row["cnt"] == 0:
-        now = datetime.now().isoformat(timespec="seconds")
-        sample_habits = [
-            "Write one sentence for an assignment",
-            "Open my notes and read for 5 minutes",
-            "Tidy my desk for two minutes",
-        ]
-        for name in sample_habits:
-            cur.execute(
-                "INSERT INTO habits (name, is_sample, created_at) VALUES (?, ?, ?)",
-                (name, 1, now),
-            )
+
+def initialize_user_data(user_id):
+    # creates alignment state and sample habits for a new user
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    cur.execute(
+        "INSERT INTO alignment_state (user_id, alignment_score, emotional_streak, last_journal_date) "
+        "VALUES (?, 0, 0, NULL);",
+        (user_id,),
+    )
+
+    now = datetime.now().isoformat(timespec="seconds")
+    sample_habits = [
+        "Write one sentence for an assignment",
+        "Open my notes and read for 5 minutes",
+        "Tidy my desk for two minutes",
+    ]
+    for name in sample_habits:
+        cur.execute(
+            "INSERT INTO habits (user_id, name, is_sample, created_at) VALUES (?, ?, 1, ?)",
+            (user_id, name, now),
+        )
 
     conn.commit()
     conn.close()
 
 
+# authentication
+
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user_id' not in session:
+            return redirect(url_for('landing'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+
 # support functions
+
+def get_greeting() -> str:
+    hour = datetime.now().hour
+    if hour < 12:
+        return "Good morning"
+    elif hour < 17:
+        return "Good afternoon"
+    elif hour < 21:
+        return "Good evening"
+    else:
+        return "Welcome back"
+
 
 def normalise_entry_text(text: str) -> str:
     # trims whitespace + capitalises first letter
@@ -134,7 +178,7 @@ def get_reframe_and_affirmation(predicted_emotion: str):
             "You can calm your mind and take one small step."
         ),
         "stuck": (
-            "Feeling stuck doesn’t mean you can’t do it. "
+            "Feeling stuck doesn't mean you can't do it. "
             "It just means the first step needs to be smaller and more approachable."
         ),
         "stressed": (
@@ -169,13 +213,14 @@ def get_reframe_and_affirmation(predicted_emotion: str):
     return reframe, affirmation
 
 
-def get_alignment_state():
-    # returns alignment score + streak for dashboard
+def get_alignment_state(user_id):
+    # returns alignment score + streak for a specific user
     conn = get_db_connection()
     cur = conn.cursor()
     cur.execute(
         "SELECT alignment_score, emotional_streak, last_journal_date "
-        "FROM alignment_state WHERE id = 1;"
+        "FROM alignment_state WHERE user_id = ?;",
+        (user_id,),
     )
     row = cur.fetchone()
     conn.close()
@@ -184,27 +229,28 @@ def get_alignment_state():
     return row["alignment_score"], row["emotional_streak"], row["last_journal_date"]
 
 
-def update_alignment_score(delta: int):
+def update_alignment_score(user_id, delta: int):
     # increase or reduce score but never below zero
     conn = get_db_connection()
     cur = conn.cursor()
     cur.execute(
         "UPDATE alignment_state "
         "SET alignment_score = MAX(alignment_score + ?, 0) "
-        "WHERE id = 1;",
-        (delta,),
+        "WHERE user_id = ?;",
+        (delta, user_id),
     )
     conn.commit()
     conn.close()
 
 
-def update_emotional_streak_for_today():
+def update_emotional_streak_for_today(user_id):
     # journals on consecutive days then streak increases, skip a day resets
     today = date.today()
     conn = get_db_connection()
     cur = conn.cursor()
     cur.execute(
-        "SELECT emotional_streak, last_journal_date FROM alignment_state WHERE id = 1;"
+        "SELECT emotional_streak, last_journal_date FROM alignment_state WHERE user_id = ?;",
+        (user_id,),
     )
     row = cur.fetchone()
     if row is None:
@@ -234,25 +280,123 @@ def update_emotional_streak_for_today():
 
     cur.execute(
         "UPDATE alignment_state SET emotional_streak = ?, last_journal_date = ? "
-        "WHERE id = 1;",
-        (streak, today.isoformat()),
+        "WHERE user_id = ?;",
+        (streak, today.isoformat(), user_id),
     )
     conn.commit()
     conn.close()
 
 
-# routes - UI screen
+# routes - authentication
 
 @app.route("/")
+def landing():
+    # public landing page — redirect to dashboard if already logged in
+    if 'user_id' in session:
+        return redirect(url_for('dashboard'))
+    return render_template("landing.html")
+
+
+@app.route("/signup", methods=["GET", "POST"])
+def signup():
+    if 'user_id' in session:
+        return redirect(url_for('dashboard'))
+
+    if request.method == "POST":
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "")
+        confirm_password = request.form.get("confirm_password", "")
+
+        if not username or not password:
+            flash("Username and password are required.", "error")
+            return render_template("signup.html")
+
+        if len(username) < 3:
+            flash("Username must be at least 3 characters.", "error")
+            return render_template("signup.html")
+
+        if len(password) < 6:
+            flash("Password must be at least 6 characters.", "error")
+            return render_template("signup.html")
+
+        if password != confirm_password:
+            flash("Passwords do not match.", "error")
+            return render_template("signup.html")
+
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("SELECT id FROM users WHERE username = ?", (username,))
+        existing = cur.fetchone()
+
+        if existing:
+            conn.close()
+            flash("Username already taken. Please choose another.", "error")
+            return render_template("signup.html")
+
+        password_hash = generate_password_hash(password)
+        cur.execute(
+            "INSERT INTO users (username, password_hash, created_at) VALUES (?, ?, ?)",
+            (username, password_hash, datetime.now().isoformat(timespec="seconds")),
+        )
+        conn.commit()
+        user_id = cur.lastrowid
+        conn.close()
+
+        initialize_user_data(user_id)
+
+        session['user_id'] = user_id
+        session['username'] = username
+        return redirect(url_for('dashboard'))
+
+    return render_template("signup.html")
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if 'user_id' in session:
+        return redirect(url_for('dashboard'))
+
+    if request.method == "POST":
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "")
+
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("SELECT id, password_hash FROM users WHERE username = ?", (username,))
+        user = cur.fetchone()
+        conn.close()
+
+        if user and check_password_hash(user["password_hash"], password):
+            session['user_id'] = user["id"]
+            session['username'] = username
+            return redirect(url_for('dashboard'))
+
+        flash("Invalid username or password.", "error")
+
+    return render_template("login.html")
+
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect(url_for('landing'))
+
+
+# routes - UI screens
+
+@app.route("/dashboard")
+@login_required
 def dashboard():
     # homepage showing score + streak + affirmation
-    alignment_score, emotional_streak, last_journal_date = get_alignment_state()
+    user_id = session['user_id']
+    alignment_score, emotional_streak, last_journal_date = get_alignment_state(user_id)
 
     conn = get_db_connection()
     cur = conn.cursor()
     cur.execute(
         "SELECT entry_text, predicted_emotion, created_at "
-        "FROM journal_entries ORDER BY id DESC LIMIT 1;"
+        "FROM journal_entries WHERE user_id = ? ORDER BY id DESC LIMIT 1;",
+        (user_id,),
     )
     last_entry = cur.fetchone()
     conn.close()
@@ -264,6 +408,7 @@ def dashboard():
 
     return render_template(
         "dashboard.html",
+        greeting=get_greeting(),
         alignment_score=alignment_score,
         emotional_streak=emotional_streak,
         today_affirmation=today_affirmation,
@@ -271,7 +416,9 @@ def dashboard():
 
 # main journaling page
 @app.route("/journal", methods=["GET", "POST"])
+@login_required
 def journal():
+    user_id = session['user_id']
     predicted_emotion = None
     reframe = None
     affirmation = None
@@ -287,24 +434,25 @@ def journal():
             conn = get_db_connection()
             cur = conn.cursor()
             cur.execute(
-                "INSERT INTO journal_entries (entry_text, predicted_emotion, created_at) "
-                "VALUES (?, ?, ?)",
-                (entry_text, predicted_emotion,
+                "INSERT INTO journal_entries (user_id, entry_text, predicted_emotion, created_at) "
+                "VALUES (?, ?, ?, ?)",
+                (user_id, entry_text, predicted_emotion,
                  datetime.now().isoformat(timespec="seconds")),
             )
             conn.commit()
             conn.close()
 
             # journaling counts as identity-aligned behaviour
-            update_alignment_score(1)
-            update_emotional_streak_for_today()
+            update_alignment_score(user_id, 1)
+            update_emotional_streak_for_today(user_id)
 
     # load journal history
     conn = get_db_connection()
     cur = conn.cursor()
     cur.execute(
         "SELECT id, entry_text, predicted_emotion, created_at "
-        "FROM journal_entries ORDER BY id DESC;"
+        "FROM journal_entries WHERE user_id = ? ORDER BY id DESC;",
+        (user_id,),
     )
     entries = cur.fetchall()
     conn.close()
@@ -319,15 +467,17 @@ def journal():
 
 
 @app.route("/journal/<int:entry_id>/edit", methods=["GET", "POST"])
+@login_required
 def edit_journal(entry_id):
     # edit an existing entry and re-predict new emotion
+    user_id = session['user_id']
 
     conn = get_db_connection()
     cur = conn.cursor()
     cur.execute(
         "SELECT id, entry_text, predicted_emotion, created_at "
-        "FROM journal_entries WHERE id = ?;",
-        (entry_id,),
+        "FROM journal_entries WHERE id = ? AND user_id = ?;",
+        (entry_id, user_id),
     )
     entry = cur.fetchone()
 
@@ -344,8 +494,8 @@ def edit_journal(entry_id):
             cur.execute(
                 "UPDATE journal_entries "
                 "SET entry_text = ?, predicted_emotion = ? "
-                "WHERE id = ?;",
-                (entry_text, new_emotion, entry_id),
+                "WHERE id = ? AND user_id = ?;",
+                (entry_text, new_emotion, entry_id, user_id),
             )
             conn.commit()
 
@@ -357,29 +507,30 @@ def edit_journal(entry_id):
 
 
 @app.route("/journal/<int:entry_id>/delete", methods=["POST"])
+@login_required
 def delete_journal(entry_id):
     # delete a journal entry and gently reduce alignment score by 1
+    user_id = session['user_id']
 
     conn = get_db_connection()
     cur = conn.cursor()
-    cur.execute("DELETE FROM journal_entries WHERE id = ?;", (entry_id,))
+    cur.execute(
+        "DELETE FROM journal_entries WHERE id = ? AND user_id = ?;",
+        (entry_id, user_id),
+    )
     conn.commit()
     conn.close()
 
     # deleting an entry removes one point but never below zero
-    update_alignment_score(-1)
+    update_alignment_score(user_id, -1)
 
     return redirect(url_for("journal"))
 
 
 @app.route("/habits", methods=["GET", "POST"])
+@login_required
 def habits():
-    """
-    habits page:
-    - show sample + user-added habits
-    - allow ticking habits as completed
-    - allow adding new habits/tasks
-    """
+    user_id = session['user_id']
 
     if request.method == "POST":
         # if user added a new habit/task
@@ -388,9 +539,9 @@ def habits():
             conn = get_db_connection()
             cur = conn.cursor()
             cur.execute(
-                "INSERT INTO habits (name, is_sample, created_at) "
-                "VALUES (?, ?, ?);",
-                (new_habit, 0, datetime.now().isoformat(timespec="seconds")),
+                "INSERT INTO habits (user_id, name, is_sample, created_at) "
+                "VALUES (?, ?, 0, ?);",
+                (user_id, new_habit, datetime.now().isoformat(timespec="seconds")),
             )
             conn.commit()
             conn.close()
@@ -409,24 +560,33 @@ def habits():
                 except ValueError:
                     continue
 
+                # verify habit belongs to this user
+                cur.execute(
+                    "SELECT id FROM habits WHERE id = ? AND user_id = ?;",
+                    (hid_int, user_id),
+                )
+                if cur.fetchone() is None:
+                    continue
+
                 cur.execute(
                     "INSERT INTO habit_completions (habit_id, completed_at) "
                     "VALUES (?, ?);",
                     (hid_int, now),
                 )
                 # each completed habit counts as identity-aligned behaviour
-                update_alignment_score(1)
+                update_alignment_score(user_id, 1)
 
             conn.commit()
             conn.close()
             return redirect(url_for("habits"))
 
-    # show all habits
+    # show all habits for this user
     conn = get_db_connection()
     cur = conn.cursor()
     cur.execute(
         "SELECT id, name, is_sample, created_at "
-        "FROM habits ORDER BY id ASC;"
+        "FROM habits WHERE user_id = ? ORDER BY id ASC;",
+        (user_id,),
     )
     habits_rows = cur.fetchall()
     conn.close()
@@ -434,16 +594,19 @@ def habits():
     return render_template("habits.html", habits=habits_rows)
 
 @app.route("/analytics")
+@login_required
 def analytics():
+    user_id = session['user_id']
     conn = get_db_connection()
     cur = conn.cursor()
 
-    # 1. emotion distribution across all journal entries
+    # 1. emotion distribution across this user's journal entries
     cur.execute("""
         SELECT predicted_emotion, COUNT(*) as count
         FROM journal_entries
+        WHERE user_id = ?
         GROUP BY predicted_emotion
-    """)
+    """, (user_id,))
     emotion_data = cur.fetchall()
 
     # 2. days user journaled in last 7 days
@@ -452,16 +615,17 @@ def analytics():
     cur.execute("""
         SELECT COUNT(DISTINCT date(created_at)) AS active_days
         FROM journal_entries
-        WHERE date(created_at) >= ?
-    """, (last_week,))
+        WHERE user_id = ? AND date(created_at) >= ?
+    """, (user_id, last_week))
     active_days = cur.fetchone()["active_days"]
 
     # 3. habit completions in last 7 days
     cur.execute("""
         SELECT COUNT(*) AS habits_done
-        FROM habit_completions
-        WHERE date(completed_at) >= ?
-    """, (last_week,))
+        FROM habit_completions hc
+        JOIN habits h ON hc.habit_id = h.id
+        WHERE h.user_id = ? AND date(hc.completed_at) >= ?
+    """, (user_id, last_week))
     habits_done = cur.fetchone()["habits_done"]
 
     conn.close()

@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Breaking Procrastination Paralysis</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <!-- fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500&family=Lora:ital,wght@0,400;0,500;1,400&display=swap"
+        rel="stylesheet"
+    >
+
+    <!-- design system -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='calm.css') }}">
+</head>
+
+<body class="landing-body">
+
+    <!-- dual-layer background for spotlight reveal -->
+    <div class="landing-bg-base"></div>
+    <div class="landing-bg-warm"></div>
+
+    <!-- organic floating shapes -->
+    <div class="organic-shapes">
+        <div class="shape shape-1"></div>
+        <div class="shape shape-2"></div>
+        <div class="shape shape-3"></div>
+    </div>
+
+    <!-- hero content -->
+    <div class="landing-hero">
+        <div class="landing-content">
+
+            <h1 class="landing-title">
+                Breaking<br>Procrastination<br>Paralysis
+            </h1>
+
+            <p class="landing-tagline">
+                Procrastination is not a productivity problem. It is an emotional one.
+                This system helps you move from avoidance to aligned action.
+                <span class="landing-tagline-sub">One gentle step at a time.</span>
+            </p>
+
+            <!-- three pillars -->
+            <div class="landing-pillars">
+
+                <div class="pillar">
+                    <div class="pillar-icon awareness-icon">~</div>
+                    <h3 class="pillar-title">Awareness</h3>
+                    <p class="pillar-desc">
+                        Journal your emotions honestly. The system detects how you feel and
+                        reflects back a gentle reframe — not a fix, just understanding.
+                    </p>
+                </div>
+
+                <div class="pillar">
+                    <div class="pillar-icon alignment-icon">*</div>
+                    <h3 class="pillar-title">Alignment</h3>
+                    <p class="pillar-desc">
+                        Build identity-based beliefs through affirmations and an alignment
+                        score that grows with every time you show up for yourself.
+                    </p>
+                </div>
+
+                <div class="pillar">
+                    <div class="pillar-icon action-icon-landing">.</div>
+                    <h3 class="pillar-title">Action</h3>
+                    <p class="pillar-desc">
+                        Take tiny, realistic steps. Not aggressive goals — just the smallest
+                        thing that proves you can move forward without overwhelm.
+                    </p>
+                </div>
+
+            </div>
+
+            <!-- call to action -->
+            <div class="landing-cta">
+                <a href="{{ url_for('signup') }}" class="btn-landing-primary">Begin your journey</a>
+                <a href="{{ url_for('login') }}" class="btn-landing-secondary">Log in</a>
+            </div>
+
+            <p class="landing-footer">
+                A psychology-grounded system for overwhelmed students and emotionally
+                avoidant individuals. Safe. Calm. Non-judgmental.
+            </p>
+
+        </div>
+    </div>
+
+    <!-- cursor spotlight + ripple (desktop only) -->
+    <div class="cursor-spotlight" id="cursorSpotlight"></div>
+    <div class="cursor-ripple" id="cursorRipple"></div>
+
+    <script>
+    (function() {
+        if (window.innerWidth < 768) return;
+
+        var spotlight = document.getElementById('cursorSpotlight');
+        var ripple = document.getElementById('cursorRipple');
+        var warmLayer = document.querySelector('.landing-bg-warm');
+        if (!spotlight || !warmLayer) return;
+
+        var mouseX = window.innerWidth / 2;
+        var mouseY = window.innerHeight / 2;
+        var spotX = mouseX;
+        var spotY = mouseY;
+
+        document.addEventListener('mousemove', function(e) {
+            mouseX = e.clientX;
+            mouseY = e.clientY;
+        });
+
+        // gentle ripple on click
+        document.addEventListener('click', function(e) {
+            if (!ripple) return;
+            ripple.style.left = e.clientX + 'px';
+            ripple.style.top = e.clientY + 'px';
+            ripple.style.opacity = '1';
+            ripple.style.transform = 'translate(-50%, -50%) scale(0)';
+
+            // force reflow then animate out
+            ripple.offsetWidth;
+            ripple.style.transform = 'translate(-50%, -50%) scale(2.5)';
+            ripple.style.opacity = '0';
+        });
+
+        function animate() {
+            // smooth follow with gentle easing
+            spotX += (mouseX - spotX) * 0.07;
+            spotY += (mouseY - spotY) * 0.07;
+
+            spotlight.style.left = spotX + 'px';
+            spotlight.style.top = spotY + 'px';
+
+            // update warm layer gradient position
+            warmLayer.style.setProperty('--mouse-x', spotX + 'px');
+            warmLayer.style.setProperty('--mouse-y', spotY + 'px');
+
+            requestAnimationFrame(animate);
+        }
+
+        animate();
+    })();
+    </script>
+
+</body>
+</html>
