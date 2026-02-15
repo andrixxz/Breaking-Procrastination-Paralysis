@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Today – Breaking Procrastination Paralysis</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500&family=Lora:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='calm.css') }}">
+</head>
+
+<body>
+<div class="page-wrapper">
+
+    <nav class="page-nav">
+        <a href="{{ url_for('dashboard') }}" class="nav-brand">Breaking Procrastination Paralysis</a>
+        <ul class="nav-links">
+            <li><a href="{{ url_for('today') }}" class="active">Today</a></li>
+            <li><a href="{{ url_for('journal') }}">Reflect</a></li>
+            <li><a href="{{ url_for('habits') }}">Tiny Steps</a></li>
+            <li><a href="{{ url_for('week') }}">Week</a></li>
+            <li><a href="{{ url_for('analytics') }}">Patterns</a></li>
+            <li><a href="{{ url_for('logout') }}" class="logout-link">Log out</a></li>
+        </ul>
+    </nav>
+
+    <main class="page-content stagger-children">
+
+        <!-- greeting -->
+        <div class="greeting">
+            <h1 class="greeting-text">{{ greeting }}</h1>
+            <p class="greeting-sub">Here is what you have on your plate today.</p>
+        </div>
+
+        <!-- quick stats -->
+        <div class="metric-grid">
+            <div class="card metric-card">
+                <span class="metric-value">{{ alignment_score }}</span>
+                <p class="metric-label">Alignment Score</p>
+            </div>
+            <div class="card metric-card">
+                <span class="metric-value">{{ emotional_streak }}</span>
+                <p class="metric-label">Day Streak</p>
+            </div>
+        </div>
+
+        <!-- today's to-do list -->
+        <div class="card" style="padding: 24px;">
+            <h2>To-Do</h2>
+            <p class="section-subtitle" style="margin-bottom: 16px;">
+                Your tasks for today. Check them off as you go.
+            </p>
+
+            {% if active_todos %}
+            <ul class="habit-list">
+                {% for todo in active_todos %}
+                <li class="habit-item">
+                    <form method="post" action="{{ url_for('toggle_todo', todo_id=todo['id']) }}" style="display: flex; align-items: center; gap: 12px; width: 100%;">
+                        <button type="submit" class="habit-checkbox" style="border: none; cursor: pointer;"></button>
+                        <span class="habit-label">
+                            {{ todo['text'] }}
+                            {% if todo['source'] == 'journal' %}
+                                <span class="habit-tag">from journal</span>
+                            {% endif %}
+                            {% if todo['due_date'] %}
+                                <span class="habit-tag">due {{ todo['due_date'] }}</span>
+                            {% endif %}
+                        </span>
+                    </form>
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <p class="empty-state" style="padding: 16px 0;">
+                Nothing here yet. Add a task below, or journal to generate one.
+            </p>
+            {% endif %}
+
+            {% if done_todos %}
+            <div style="margin-top: 16px; padding-top: 12px; border-top: 1px solid rgba(0,0,0,0.05);">
+                <small style="color: var(--text-muted);">Completed today</small>
+                {% for todo in done_todos %}
+                <p style="font-size: 0.85rem; color: var(--text-muted); text-decoration: line-through; margin-top: 4px;">
+                    {{ todo['text'] }}
+                </p>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <!-- add manual todo -->
+            <form method="post" action="{{ url_for('add_manual_todo') }}" style="margin-top: 16px;">
+                <div class="add-habit-wrapper">
+                    <input type="text" name="todo_text" placeholder="Add a task for today...">
+                    <input type="date" name="due_date" style="max-width: 160px;">
+                    <button class="btn-gentle" type="submit">Add</button>
+                </div>
+            </form>
+        </div>
+
+        <!-- habit tracker -->
+        <div class="card" style="padding: 24px;">
+            <h2>Daily Habits</h2>
+            <p class="section-subtitle" style="margin-bottom: 16px;">
+                Small actions that build who you are becoming.
+            </p>
+
+            {% if habits %}
+            <ul class="habit-list">
+                {% for h in habits %}
+                <li class="habit-item">
+                    <form method="post" action="{{ url_for('toggle_habit', habit_id=h['id']) }}" style="display: flex; align-items: center; gap: 12px; width: 100%;">
+                        <input
+                            class="habit-checkbox"
+                            type="checkbox"
+                            onchange="this.form.submit()"
+                            {{ 'checked' if h['id'] in completed_habit_ids }}
+                        >
+                        <label class="habit-label">
+                            {{ h['name'] }}
+                            {% if h['is_sample'] %}
+                                <span class="habit-tag">suggestion</span>
+                            {% endif %}
+                        </label>
+                    </form>
+                </li>
+                {% endfor %}
+            </ul>
+            <p style="margin-top: 12px;">
+                <a href="{{ url_for('habits') }}" class="btn-text">Manage habits</a>
+            </p>
+            {% else %}
+            <p class="empty-state" style="padding: 16px 0;">
+                No habits set up yet.
+                <a href="{{ url_for('habits') }}" class="btn-text">Add your first tiny step</a>
+            </p>
+            {% endif %}
+        </div>
+
+        <!-- upcoming this week -->
+        {% if upcoming_count > 0 %}
+        <div class="card" style="padding: 24px; text-align: center;">
+            <p style="color: var(--text-secondary);">
+                You have <strong>{{ upcoming_count }}</strong> task{{ 's' if upcoming_count != 1 }} due this week.
+            </p>
+            <a href="{{ url_for('week') }}" class="btn-text" style="margin-top: 8px;">View weekly overview</a>
+        </div>
+        {% endif %}
+
+        <!-- navigation actions -->
+        <div class="nav-actions">
+            <a href="{{ url_for('journal') }}" class="nav-action-link">
+                <span class="action-icon icon-awareness">~</span>
+                <span class="action-text">
+                    <span class="action-label">Check in with yourself</span>
+                    <span class="action-hint">Awareness journaling</span>
+                </span>
+            </a>
+            <a href="{{ url_for('analytics') }}" class="nav-action-link">
+                <span class="action-icon icon-patterns">*</span>
+                <span class="action-text">
+                    <span class="action-label">Notice patterns</span>
+                    <span class="action-hint">Emotional insights</span>
+                </span>
+            </a>
+        </div>
+
+    </main>
+
+</div>
+
+<div class="cursor-glow" id="cursorGlow"></div>
+<script>
+(function() {
+    const glow = document.getElementById('cursorGlow');
+    if (!glow || window.innerWidth < 768) return;
+
+    let mouseX = -300, mouseY = -300;
+    let glowX = -300, glowY = -300;
+
+    document.addEventListener('mousemove', function(e) {
+        mouseX = e.clientX;
+        mouseY = e.clientY;
+    });
+
+    function animate() {
+        glowX += (mouseX - glowX) * 0.12;
+        glowY += (mouseY - glowY) * 0.12;
+        glow.style.left = glowX + 'px';
+        glow.style.top = glowY + 'px';
+        requestAnimationFrame(animate);
+    }
+    animate();
+})();
+</script>
+</body>
+</html>

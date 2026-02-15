@@ -24,9 +24,10 @@
     <nav class="page-nav">
         <a href="{{ url_for('dashboard') }}" class="nav-brand">Breaking Procrastination Paralysis</a>
         <ul class="nav-links">
-            <li><a href="{{ url_for('dashboard') }}">Today</a></li>
+            <li><a href="{{ url_for('today') }}">Today</a></li>
             <li><a href="{{ url_for('journal') }}">Reflect</a></li>
             <li><a href="{{ url_for('habits') }}" class="active">Tiny Steps</a></li>
+            <li><a href="{{ url_for('week') }}">Week</a></li>
             <li><a href="{{ url_for('analytics') }}">Patterns</a></li>
             <li><a href="{{ url_for('logout') }}" class="logout-link">Log out</a></li>
         </ul>
@@ -99,7 +100,7 @@
         </div>
 
         <div style="margin-top: 40px;">
-            <a href="{{ url_for('dashboard') }}" class="btn-text">Return to your space</a>
+            <a href="{{ url_for('today') }}" class="btn-text">Return to your space</a>
         </div>
 
     </main>

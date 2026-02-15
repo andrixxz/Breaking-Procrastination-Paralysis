@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Weekly Overview – Breaking Procrastination Paralysis</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500&family=Lora:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='calm.css') }}">
+</head>
+
+<body>
+<div class="page-wrapper">
+
+    <nav class="page-nav">
+        <a href="{{ url_for('dashboard') }}" class="nav-brand">Breaking Procrastination Paralysis</a>
+        <ul class="nav-links">
+            <li><a href="{{ url_for('today') }}">Today</a></li>
+            <li><a href="{{ url_for('journal') }}">Reflect</a></li>
+            <li><a href="{{ url_for('habits') }}">Tiny Steps</a></li>
+            <li><a href="{{ url_for('week') }}" class="active">Week</a></li>
+            <li><a href="{{ url_for('analytics') }}">Patterns</a></li>
+            <li><a href="{{ url_for('logout') }}" class="logout-link">Log out</a></li>
+        </ul>
+    </nav>
+
+    <main class="page-content stagger-children">
+
+        <div class="section-header fade-in-up">
+            <h1 class="section-title">Weekly Overview</h1>
+            <p class="section-subtitle">
+                A calm look at what is ahead this week and how your habits are going.
+            </p>
+        </div>
+
+        <!-- weekly stats -->
+        <div class="patterns-grid">
+            <div class="card pattern-card">
+                <p class="pattern-value">{{ week_todos | length }}</p>
+                <p class="pattern-label">Tasks due this week</p>
+            </div>
+            <div class="card pattern-card">
+                <p class="pattern-value">{{ journal_count }}</p>
+                <p class="pattern-label">Journal entries this week</p>
+            </div>
+        </div>
+
+        <!-- tasks due this week -->
+        <div class="card" style="padding: 24px;">
+            <h2>Tasks Due This Week</h2>
+            <p class="section-subtitle" style="margin-bottom: 16px;">
+                What needs attention in the next 7 days.
+            </p>
+
+            {% if week_todos %}
+            <ul class="habit-list">
+                {% for todo in week_todos %}
+                <li class="habit-item" style="justify-content: space-between;">
+                    <div style="display: flex; align-items: center; gap: 12px; flex: 1;">
+                        {% if todo['is_done'] %}
+                            <span style="color: var(--sage-green); font-size: 1.1rem;">&#10003;</span>
+                            <span class="habit-label" style="text-decoration: line-through; color: var(--text-muted);">{{ todo['text'] }}</span>
+                        {% else %}
+                            <form method="post" action="{{ url_for('toggle_todo', todo_id=todo['id']) }}" style="display: flex; align-items: center; gap: 12px;">
+                                <input type="hidden" name="redirect" value="week">
+                                <button type="submit" class="habit-checkbox" style="border: none; cursor: pointer;"></button>
+                                <span class="habit-label">{{ todo['text'] }}</span>
+                            </form>
+                        {% endif %}
+                    </div>
+                    {% if todo['due_date'] %}
+                    <span class="habit-tag" style="{% if todo['due_date'] == today_str %}background: var(--blush-pink-light);{% endif %}">
+                        {{ todo['due_date'] }}
+                    </span>
+                    {% endif %}
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <p class="empty-state" style="padding: 16px 0;">
+                No dated tasks for the coming week. You can add dates to tasks on the Today page.
+            </p>
+            {% endif %}
+        </div>
+
+        <!-- undated tasks -->
+        {% if undated_todos %}
+        <div class="card" style="padding: 24px;">
+            <h2>Undated Tasks</h2>
+            <p class="section-subtitle" style="margin-bottom: 16px;">
+                Tasks without a deadline — do them whenever feels right.
+            </p>
+            <ul class="habit-list">
+                {% for todo in undated_todos %}
+                <li class="habit-item">
+                    <form method="post" action="{{ url_for('toggle_todo', todo_id=todo['id']) }}" style="display: flex; align-items: center; gap: 12px;">
+                        <input type="hidden" name="redirect" value="week">
+                        <button type="submit" class="habit-checkbox" style="border: none; cursor: pointer;"></button>
+                        <span class="habit-label">{{ todo['text'] }}</span>
+                    </form>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+
+        <!-- habit summary -->
+        <div class="card" style="padding: 24px;">
+            <h2>Habit Summary — Last 7 Days</h2>
+            <p class="section-subtitle" style="margin-bottom: 16px;">
+                How often you completed each habit this week.
+            </p>
+
+            {% if habit_summary %}
+            <ul class="emotion-bar-list">
+                {% for h in habit_summary %}
+                <li class="emotion-bar-item">
+                    <span class="emotion-bar-name" style="width: auto; min-width: 140px;">{{ h['name'][:30] }}</span>
+                    <div class="emotion-bar-track">
+                        <div
+                            class="emotion-bar-fill calm"
+                            style="width: {{ (h['completions'] / 7 * 100) | round }}%;"
+                        ></div>
+                    </div>
+                    <span class="emotion-bar-count">{{ h['completions'] }}/7</span>
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <p class="empty-state" style="padding: 16px 0;">
+                No habits tracked yet. Visit the Today page to get started.
+            </p>
+            {% endif %}
+        </div>
+
+        <div style="margin-top: 24px;">
+            <a href="{{ url_for('today') }}" class="btn-text">Back to Today</a>
+        </div>
+
+    </main>
+
+</div>
+
+<div class="cursor-glow" id="cursorGlow"></div>
+<script>
+(function() {
+    const glow = document.getElementById('cursorGlow');
+    if (!glow || window.innerWidth < 768) return;
+
+    let mouseX = -300, mouseY = -300;
+    let glowX = -300, glowY = -300;
+
+    document.addEventListener('mousemove', function(e) {
+        mouseX = e.clientX;
+        mouseY = e.clientY;
+    });
+
+    function animate() {
+        glowX += (mouseX - glowX) * 0.12;
+        glowY += (mouseY - glowY) * 0.12;
+        glow.style.left = glowX + 'px';
+        glow.style.top = glowY + 'px';
+        requestAnimationFrame(animate);
+    }
+    animate();
+})();
+</script>
+</body>
+</html>

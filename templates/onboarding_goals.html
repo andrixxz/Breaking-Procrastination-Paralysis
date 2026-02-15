@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Set Your Goals – Breaking Procrastination Paralysis</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500&family=Lora:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='calm.css') }}">
+</head>
+
+<body>
+<div class="page-wrapper">
+
+    <main class="page-content" style="max-width: 700px; margin: 0 auto; padding-top: 60px;">
+
+        <!-- Progress Indicator -->
+        <div style="text-align: center; margin-bottom: 40px;">
+            <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 8px;">
+                Step {{ step }} of {{ total_steps }}
+            </p>
+            <div style="width: 100%; height: 6px; background: var(--bg-secondary); border-radius: 3px; overflow: hidden;">
+                <div style="width: {{ (step / total_steps) * 100 }}%; height: 100%; background: var(--sage-green); transition: width 0.4s;"></div>
+            </div>
+        </div>
+
+        <div class="section-header fade-in-up">
+            <h1 class="section-title">What are your top 3 goals?</h1>
+            <p class="section-subtitle">
+                Think about the next 3 months. What do you want to achieve?<br>
+                Be specific and honest with yourself.
+            </p>
+        </div>
+
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+            <div class="auth-flash" style="margin-bottom: 24px;">
+                {% for message in messages %}
+                <p>{{ message }}</p>
+                {% endfor %}
+            </div>
+            {% endif %}
+        {% endwith %}
+
+        <form method="post" class="fade-in-up">
+
+            <div class="form-group">
+                <label for="goal_1" class="form-label">Goal 1</label>
+                <textarea
+                    id="goal_1"
+                    name="goal_1"
+                    rows="2"
+                    required
+                    placeholder="E.g., Complete my final year project"
+                >{{ existing_goals[0] }}</textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="goal_2" class="form-label">Goal 2</label>
+                <textarea
+                    id="goal_2"
+                    name="goal_2"
+                    rows="2"
+                    required
+                    placeholder="E.g., Build a consistent study routine"
+                >{{ existing_goals[1] }}</textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="goal_3" class="form-label">Goal 3</label>
+                <textarea
+                    id="goal_3"
+                    name="goal_3"
+                    rows="2"
+                    required
+                    placeholder="E.g., Improve my time management skills"
+                >{{ existing_goals[2] }}</textarea>
+            </div>
+
+            <button type="submit" class="btn-calm" style="width: 100%; margin-top: 16px;">
+                Next: Identity Beliefs →
+            </button>
+
+        </form>
+
+    </main>
+
+</div>
+
+<div class="cursor-glow" id="cursorGlow"></div>
+<script>
+(function() {
+    const glow = document.getElementById('cursorGlow');
+    if (!glow || window.innerWidth < 768) return;
+
+    let mouseX = -300, mouseY = -300;
+    let glowX = -300, glowY = -300;
+
+    document.addEventListener('mousemove', function(e) {
+        mouseX = e.clientX;
+        mouseY = e.clientY;
+    });
+
+    function animate() {
+        glowX += (mouseX - glowX) * 0.12;
+        glowY += (mouseY - glowY) * 0.12;
+        glow.style.left = glowX + 'px';
+        glow.style.top = glowY + 'px';
+        requestAnimationFrame(animate);
+    }
+    animate();
+})();
+</script>
+</body>
+</html>
