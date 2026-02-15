@@ -18,64 +18,107 @@
 </head>
 
 <body>
-<div class="auth-wrapper">
+<div class="auth-page">
 
-    <div class="auth-container">
-
-        <div class="auth-header">
-            <h1 class="auth-title">Welcome back</h1>
-            <p class="auth-subtitle">Log in to continue your journey.</p>
+    <!-- decorative illustration panel -->
+    <div class="auth-illustration">
+        <div class="auth-illus-shapes">
+            <div class="auth-shape auth-shape-1"></div>
+            <div class="auth-shape auth-shape-2"></div>
+            <div class="auth-shape auth-shape-3"></div>
         </div>
-
-        {% with messages = get_flashed_messages() %}
-            {% if messages %}
-            <div class="auth-flash">
-                {% for message in messages %}
-                <p>{{ message }}</p>
-                {% endfor %}
-            </div>
-            {% endif %}
-        {% endwith %}
-
-        <form method="post" class="auth-form">
-
-            <div class="form-group">
-                <label for="username" class="form-label">Username</label>
-                <input
-                    type="text"
-                    id="username"
-                    name="username"
-                    required
-                    autofocus
-                    placeholder="Your username"
-                >
-            </div>
-
-            <div class="form-group">
-                <label for="password" class="form-label">Password</label>
-                <input
-                    type="password"
-                    id="password"
-                    name="password"
-                    required
-                    placeholder="Your password"
-                >
-            </div>
-
-            <button type="submit" class="btn-calm btn-auth-submit">Log in</button>
-
-        </form>
-
-        <div class="auth-footer">
-            <p>
-                Don't have an account?
-                <a href="{{ url_for('signup') }}" class="auth-link">Sign up</a>
+        <div class="auth-illus-content">
+            <!-- inline SVG: calm plant/leaf illustration -->
+            <svg class="auth-illus-svg" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <!-- pot -->
+                <ellipse cx="100" cy="170" rx="35" ry="8" fill="rgba(255,255,255,0.15)"/>
+                <path d="M75 140 L80 170 L120 170 L125 140 Z" fill="rgba(255,255,255,0.25)" rx="4"/>
+                <path d="M78 140 L122 140" stroke="rgba(255,255,255,0.35)" stroke-width="2" stroke-linecap="round"/>
+                <!-- stem -->
+                <path d="M100 140 C100 120 95 100 100 80" stroke="rgba(255,255,255,0.4)" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+                <!-- leaves -->
+                <path d="M100 120 C85 105 70 108 65 95 C80 95 90 100 100 120" fill="rgba(255,255,255,0.2)" stroke="rgba(255,255,255,0.3)" stroke-width="1"/>
+                <path d="M100 105 C115 90 130 93 135 80 C120 80 110 85 100 105" fill="rgba(255,255,255,0.2)" stroke="rgba(255,255,255,0.3)" stroke-width="1"/>
+                <path d="M100 90 C85 75 70 78 62 65 C77 65 87 70 100 90" fill="rgba(255,255,255,0.15)" stroke="rgba(255,255,255,0.25)" stroke-width="1"/>
+                <!-- small sprout at top -->
+                <path d="M100 80 C95 65 100 50 105 40" stroke="rgba(255,255,255,0.35)" stroke-width="2" stroke-linecap="round" fill="none"/>
+                <path d="M105 40 C110 50 120 48 125 42 C115 38 108 42 105 40" fill="rgba(255,255,255,0.2)"/>
+                <!-- sun -->
+                <circle cx="155" cy="35" r="14" fill="rgba(255,255,255,0.15)"/>
+                <circle cx="155" cy="35" r="8" fill="rgba(255,255,255,0.2)"/>
+            </svg>
+            <p class="auth-illus-quote">
+                "Growth is not about perfection.<br>It is about showing up gently,<br>one moment at a time."
             </p>
-            <p>
-                <a href="{{ url_for('landing') }}" class="auth-link-subtle">Back to home</a>
-            </p>
+            <a href="{{ url_for('landing') }}" class="auth-illus-home">Breaking Procrastination Paralysis</a>
         </div>
+    </div>
 
+    <!-- form panel -->
+    <div class="auth-form-panel">
+        <div class="auth-container-split">
+
+            <!-- auth tabs -->
+            <div class="auth-tabs">
+                <a href="{{ url_for('login') }}" class="auth-tab active">Log In</a>
+                <a href="{{ url_for('signup') }}" class="auth-tab">Sign Up</a>
+            </div>
+
+            <div class="auth-header">
+                <h1 class="auth-title">Welcome back</h1>
+                <p class="auth-subtitle">Log in to continue your journey.</p>
+            </div>
+
+            {% with messages = get_flashed_messages() %}
+                {% if messages %}
+                <div class="auth-flash">
+                    {% for message in messages %}
+                    <p>{{ message }}</p>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            {% endwith %}
+
+            <form method="post" class="auth-form">
+
+                <div class="form-group">
+                    <label for="username" class="form-label">Username</label>
+                    <input
+                        type="text"
+                        id="username"
+                        name="username"
+                        required
+                        autofocus
+                        placeholder="Your username"
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label for="password" class="form-label">Password</label>
+                    <input
+                        type="password"
+                        id="password"
+                        name="password"
+                        required
+                        placeholder="Your password"
+                    >
+                </div>
+
+                <button type="submit" class="btn-calm btn-auth-submit">Log in</button>
+
+            </form>
+
+            <div class="auth-footer">
+                <p>
+                    Don't have an account?
+                    <a href="{{ url_for('signup') }}" class="auth-link">Sign up</a>
+                </p>
+                <p>
+                    <a href="{{ url_for('landing') }}" class="auth-link-subtle">Back to home</a>
+                </p>
+            </div>
+
+        </div>
     </div>
 
 </div>

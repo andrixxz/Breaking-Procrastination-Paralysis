@@ -18,75 +18,126 @@
 </head>
 
 <body>
-<div class="auth-wrapper">
+<div class="auth-page">
 
-    <div class="auth-container">
-
-        <div class="auth-header">
-            <h1 class="auth-title">Begin your journey</h1>
-            <p class="auth-subtitle">Create an account to start building gentle habits.</p>
+    <!-- decorative illustration panel -->
+    <div class="auth-illustration">
+        <div class="auth-illus-shapes">
+            <div class="auth-shape auth-shape-1"></div>
+            <div class="auth-shape auth-shape-2"></div>
+            <div class="auth-shape auth-shape-3"></div>
         </div>
-
-        {% with messages = get_flashed_messages() %}
-            {% if messages %}
-            <div class="auth-flash">
-                {% for message in messages %}
-                <p>{{ message }}</p>
-                {% endfor %}
-            </div>
-            {% endif %}
-        {% endwith %}
-
-        <form method="post" class="auth-form">
-
-            <div class="form-group">
-                <label for="username" class="form-label">Choose a username</label>
-                <input
-                    type="text"
-                    id="username"
-                    name="username"
-                    required
-                    autofocus
-                    placeholder="At least 3 characters"
-                >
-            </div>
-
-            <div class="form-group">
-                <label for="password" class="form-label">Create a password</label>
-                <input
-                    type="password"
-                    id="password"
-                    name="password"
-                    required
-                    placeholder="At least 6 characters"
-                >
-            </div>
-
-            <div class="form-group">
-                <label for="confirm_password" class="form-label">Confirm password</label>
-                <input
-                    type="password"
-                    id="confirm_password"
-                    name="confirm_password"
-                    required
-                    placeholder="Type your password again"
-                >
-            </div>
-
-            <button type="submit" class="btn-calm btn-auth-submit">Sign up</button>
-
-        </form>
-
-        <div class="auth-footer">
-            <p>
-                Already have an account?
-                <a href="{{ url_for('login') }}" class="auth-link">Log in</a>
+        <div class="auth-illus-content">
+            <!-- inline SVG: sunrise over hills -->
+            <svg class="auth-illus-svg" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <!-- hills -->
+                <path d="M0 160 Q50 120 100 140 Q150 160 200 130 L200 200 L0 200 Z" fill="rgba(255,255,255,0.12)"/>
+                <path d="M0 175 Q60 145 120 160 Q170 175 200 155 L200 200 L0 200 Z" fill="rgba(255,255,255,0.08)"/>
+                <!-- sun rising -->
+                <circle cx="100" cy="100" r="25" fill="rgba(255,255,255,0.15)"/>
+                <circle cx="100" cy="100" r="16" fill="rgba(255,255,255,0.2)"/>
+                <!-- sun rays -->
+                <line x1="100" y1="68" x2="100" y2="58" stroke="rgba(255,255,255,0.2)" stroke-width="2" stroke-linecap="round"/>
+                <line x1="100" y1="132" x2="100" y2="142" stroke="rgba(255,255,255,0.2)" stroke-width="2" stroke-linecap="round"/>
+                <line x1="68" y1="100" x2="58" y2="100" stroke="rgba(255,255,255,0.2)" stroke-width="2" stroke-linecap="round"/>
+                <line x1="132" y1="100" x2="142" y2="100" stroke="rgba(255,255,255,0.2)" stroke-width="2" stroke-linecap="round"/>
+                <line x1="78" y1="78" x2="71" y2="71" stroke="rgba(255,255,255,0.15)" stroke-width="2" stroke-linecap="round"/>
+                <line x1="122" y1="78" x2="129" y2="71" stroke="rgba(255,255,255,0.15)" stroke-width="2" stroke-linecap="round"/>
+                <line x1="78" y1="122" x2="71" y2="129" stroke="rgba(255,255,255,0.15)" stroke-width="2" stroke-linecap="round"/>
+                <line x1="122" y1="122" x2="129" y2="129" stroke="rgba(255,255,255,0.15)" stroke-width="2" stroke-linecap="round"/>
+                <!-- small tree on hill -->
+                <line x1="60" y1="152" x2="60" y2="135" stroke="rgba(255,255,255,0.25)" stroke-width="2" stroke-linecap="round"/>
+                <circle cx="60" cy="130" r="8" fill="rgba(255,255,255,0.15)"/>
+                <!-- small tree on hill 2 -->
+                <line x1="150" y1="145" x2="150" y2="128" stroke="rgba(255,255,255,0.25)" stroke-width="2" stroke-linecap="round"/>
+                <circle cx="150" cy="123" r="7" fill="rgba(255,255,255,0.15)"/>
+                <!-- birds -->
+                <path d="M75 70 Q78 66 81 70" stroke="rgba(255,255,255,0.2)" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+                <path d="M130 60 Q134 55 138 60" stroke="rgba(255,255,255,0.15)" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+            </svg>
+            <p class="auth-illus-quote">
+                "Every journey starts with<br>a single gentle step.<br>This is yours."
             </p>
-            <p>
-                <a href="{{ url_for('landing') }}" class="auth-link-subtle">Back to home</a>
-            </p>
+            <a href="{{ url_for('landing') }}" class="auth-illus-home">Breaking Procrastination Paralysis</a>
         </div>
+    </div>
 
+    <!-- form panel -->
+    <div class="auth-form-panel">
+        <div class="auth-container-split">
+
+            <!-- auth tabs -->
+            <div class="auth-tabs">
+                <a href="{{ url_for('login') }}" class="auth-tab">Log In</a>
+                <a href="{{ url_for('signup') }}" class="auth-tab active">Sign Up</a>
+            </div>
+
+            <div class="auth-header">
+                <h1 class="auth-title">Begin your journey</h1>
+                <p class="auth-subtitle">Create an account to start building gentle habits.</p>
+            </div>
+
+            {% with messages = get_flashed_messages() %}
+                {% if messages %}
+                <div class="auth-flash">
+                    {% for message in messages %}
+                    <p>{{ message }}</p>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            {% endwith %}
+
+            <form method="post" class="auth-form">
+
+                <div class="form-group">
+                    <label for="username" class="form-label">Choose a username</label>
+                    <input
+                        type="text"
+                        id="username"
+                        name="username"
+                        required
+                        autofocus
+                        placeholder="At least 3 characters"
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label for="password" class="form-label">Create a password</label>
+                    <input
+                        type="password"
+                        id="password"
+                        name="password"
+                        required
+                        placeholder="At least 6 characters"
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label for="confirm_password" class="form-label">Confirm password</label>
+                    <input
+                        type="password"
+                        id="confirm_password"
+                        name="confirm_password"
+                        required
+                        placeholder="Type your password again"
+                    >
+                </div>
+
+                <button type="submit" class="btn-calm btn-auth-submit">Sign up</button>
+
+            </form>
+
+            <div class="auth-footer">
+                <p>
+                    Already have an account?
+                    <a href="{{ url_for('login') }}" class="auth-link">Log in</a>
+                </p>
+                <p>
+                    <a href="{{ url_for('landing') }}" class="auth-link-subtle">Back to home</a>
+                </p>
+            </div>
+
+        </div>
     </div>
 
 </div>
