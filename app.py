@@ -10,6 +10,11 @@ from functools import wraps
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
 
+# Session configuration - ensures sessions persist across requests
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['SESSION_COOKIE_SECURE'] = False  # Set to True in production with HTTPS
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)
+
 # file paths
 BASE_DIR = os.path.dirname(__file__)
 MODEL_DIR = os.path.join(BASE_DIR, "models") # where ML model + vectorizer are stored
@@ -344,6 +349,7 @@ def signup():
 
         initialize_user_data(user_id)
 
+        session.permanent = True
         session['user_id'] = user_id
         session['username'] = username
         return redirect(url_for('dashboard'))
@@ -367,6 +373,7 @@ def login():
         conn.close()
 
         if user and check_password_hash(user["password_hash"], password):
+            session.permanent = True
             session['user_id'] = user["id"]
             session['username'] = username
             return redirect(url_for('dashboard'))

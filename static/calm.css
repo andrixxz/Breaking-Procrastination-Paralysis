@@ -5,32 +5,42 @@
 
 /* --- Custom Properties --- */
 :root {
-    /* Primary — emotional grounding */
-    --sage-green: #A8B5A0;
-    --sage-green-dark: #8FA387;
-    --warm-sand: #E8DDD0;
-    --soft-lavender: #C5C6E3;
+    /* Primary — emotional grounding (BOOSTED saturation & contrast) */
+    --sage-green: #7FA372;
+    --sage-green-dark: #5D8A52;
+    --sage-green-light: #A4C497;
+    --warm-sand: #E0C9B0;
+    --soft-lavender: #A8AADB;
 
-    /* Accent — gentle encouragement */
-    --blush-pink: #E7CFCF;
-    --cream: #F7F4ED;
-    --stone-gray: #7A7A7A;
-    --stone-gray-light: #A0A0A0;
+    /* Accent — gentle encouragement (MORE VIBRANT) */
+    --blush-pink: #F4A5A8;
+    --blush-pink-light: #FFD4D6;
+    --cream: #FFF9F0;
+    --stone-gray: #6B6B6B;
+    --stone-gray-light: #9E9E9E;
 
-    /* Background layers */
-    --bg-primary: #FAF8F3;
-    --bg-secondary: #F0EDE6;
+    /* Background layers (soft cherry red tones) */
+    --bg-primary: #FBF7F8;
+    --bg-secondary: #F5EDEF;
     --bg-card: #FFFFFF;
 
-    /* Emotional states */
-    --awareness-blue: #B8CAD9;
-    --alignment-gold: #D9C9A3;
-    --action-green: #C8D4C0;
+    /* Emotional states (MUCH MORE VIBRANT & DISTINCT) */
+    --awareness-blue: #6BA3D0;
+    --alignment-gold: #D4AF6A;
+    --action-green: #7FA372;
 
-    /* Text */
-    --text-primary: #2A2A2A;
-    --text-secondary: #5A5A5A;
-    --text-muted: #8A8A8A;
+    /* Emotion-specific colors (inspired by Daylio/How We Feel) */
+    --emotion-overwhelmed: #E57373;
+    --emotion-anxious: #BA68C8;
+    --emotion-stuck: #FFA726;
+    --emotion-stressed: #EF5350;
+    --emotion-tired: #64B5F6;
+    --emotion-calm: #81C784;
+
+    /* Text (higher contrast) */
+    --text-primary: #1F1F1F;
+    --text-secondary: #4A4A4A;
+    --text-muted: #7A7A7A;
 
     /* Timing */
     --transition-quick: 0.3s;
@@ -76,25 +86,27 @@ body {
 
 h1, h2, h3, h4 {
     font-family: 'Lora', Georgia, serif;
-    font-weight: 400;
+    font-weight: 500;
     color: var(--text-primary);
     line-height: 1.3;
     margin: 0;
 }
 
 h1 {
-    font-size: 2rem;
-    letter-spacing: -0.5px;
+    font-size: 2.2rem;
+    letter-spacing: -0.6px;
     margin-bottom: var(--space-sm);
+    font-weight: 600;
 }
 
 h2 {
-    font-size: 1.4rem;
+    font-size: 1.5rem;
     margin-bottom: var(--space-sm);
+    font-weight: 500;
 }
 
 h3 {
-    font-size: 1.15rem;
+    font-size: 1.2rem;
     font-weight: 500;
 }
 
@@ -213,24 +225,26 @@ a:hover {
 
 /* --- Cards --- */
 .card {
-    background: var(--bg-card);
-    border: none;
+    background: linear-gradient(145deg, #FFFFFF 0%, #FFFCFD 100%);
+    border: 1px solid rgba(244, 165, 168, 0.15);
     border-radius: var(--radius-lg);
     padding: var(--space-md);
-    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+    box-shadow: 0 2px 16px rgba(244, 165, 168, 0.12), 0 1px 4px rgba(0, 0, 0, 0.04);
     transition: all var(--transition-medium) var(--ease-calm);
     margin-bottom: var(--space-md);
 }
 
 .card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+    transform: translateY(-3px);
+    box-shadow: 0 8px 28px rgba(244, 165, 168, 0.18), 0 4px 12px rgba(0, 0, 0, 0.06);
+    border-color: rgba(244, 165, 168, 0.25);
 }
 
 .card-affirmation {
-    background: linear-gradient(135deg, var(--cream), var(--warm-sand));
+    background: linear-gradient(135deg, #FFF9F0 0%, #FFE8D4 50%, #FFD9BC 100%);
     text-align: center;
     padding: var(--space-lg) var(--space-md);
+    border: 1px solid rgba(212, 175, 106, 0.2);
 }
 
 .card-affirmation p {
@@ -257,21 +271,26 @@ a:hover {
 .metric-card {
     text-align: center;
     padding: var(--space-lg) var(--space-md);
+    background: linear-gradient(145deg, #FFFFFF 0%, #FFF9FA 100%);
+    border: 1px solid rgba(244, 165, 168, 0.15);
 }
 
 .metric-value {
     font-family: 'Lora', Georgia, serif;
-    font-size: 2.5rem;
-    font-weight: 400;
-    color: var(--text-primary);
+    font-size: 2.8rem;
+    font-weight: 600;
+    background: linear-gradient(135deg, var(--sage-green-dark) 0%, var(--sage-green) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
     line-height: 1;
     margin-bottom: var(--space-xs);
 }
 
 .metric-label {
-    font-size: 0.85rem;
-    color: var(--text-muted);
-    font-weight: 400;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    font-weight: 500;
 }
 
 /* --- Alignment Circle --- */
@@ -289,11 +308,15 @@ a:hover {
     align-items: center;
     justify-content: center;
     background: conic-gradient(
-        var(--sage-green) calc(var(--progress) * 3.6deg),
-        var(--cream) 0
+        from 0deg,
+        var(--sage-green-dark) 0deg,
+        var(--sage-green) calc(var(--progress) * 1.8deg),
+        var(--sage-green-light) calc(var(--progress) * 3.6deg),
+        #F0F4EE calc(var(--progress) * 3.6deg)
     );
     animation: breathe var(--transition-breath) ease-in-out infinite;
     position: relative;
+    box-shadow: 0 4px 16px rgba(127, 163, 114, 0.2);
 }
 
 .alignment-circle-inner {
@@ -387,22 +410,24 @@ a:hover {
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    background: var(--sage-green);
-    color: var(--text-primary);
+    background: linear-gradient(135deg, var(--sage-green-light) 0%, var(--sage-green) 100%);
+    color: white;
     border: none;
     border-radius: var(--radius-pill);
     padding: 12px 28px;
     font-size: 0.95rem;
-    font-weight: 400;
+    font-weight: 500;
     font-family: inherit;
     letter-spacing: 0.3px;
     cursor: pointer;
+    box-shadow: 0 4px 12px rgba(127, 163, 114, 0.25);
     transition: all var(--transition-quick) var(--ease-calm);
 }
 
 .btn-calm:hover {
-    background: var(--sage-green-dark);
-    transform: scale(1.02);
+    background: linear-gradient(135deg, var(--sage-green) 0%, var(--sage-green-dark) 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(127, 163, 114, 0.35);
 }
 
 .btn-gentle {
@@ -597,25 +622,44 @@ input::placeholder {
     align-items: center;
 }
 
-/* --- Emotion Badge --- */
+/* --- Emotion Badge (VIBRANT & DISTINCT - inspired by Daylio/How We Feel) --- */
 .emotion-badge {
     display: inline-block;
-    padding: 3px 10px;
+    padding: 4px 12px;
     border-radius: var(--radius-pill);
-    font-size: 0.72rem;
-    font-weight: 400;
+    font-size: 0.75rem;
+    font-weight: 500;
     letter-spacing: 0.3px;
     text-transform: capitalize;
-    background: var(--action-green);
-    color: var(--text-primary);
+    background: var(--emotion-calm);
+    color: white;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+    transition: all var(--transition-quick) var(--ease-calm);
 }
 
-.emotion-badge.overwhelmed { background: var(--blush-pink); }
-.emotion-badge.anxious { background: var(--soft-lavender); }
-.emotion-badge.stuck { background: var(--warm-sand); }
-.emotion-badge.stressed { background: var(--blush-pink); }
-.emotion-badge.tired { background: var(--awareness-blue); }
-.emotion-badge.calm { background: var(--action-green); }
+.emotion-badge:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+}
+
+.emotion-badge.overwhelmed {
+    background: linear-gradient(135deg, var(--emotion-overwhelmed) 0%, #EF5350 100%);
+}
+.emotion-badge.anxious {
+    background: linear-gradient(135deg, var(--emotion-anxious) 0%, #AB47BC 100%);
+}
+.emotion-badge.stuck {
+    background: linear-gradient(135deg, var(--emotion-stuck) 0%, #FB8C00 100%);
+}
+.emotion-badge.stressed {
+    background: linear-gradient(135deg, var(--emotion-stressed) 0%, #E53935 100%);
+}
+.emotion-badge.tired {
+    background: linear-gradient(135deg, var(--emotion-tired) 0%, #42A5F5 100%);
+}
+.emotion-badge.calm {
+    background: linear-gradient(135deg, var(--emotion-calm) 0%, #66BB6A 100%);
+}
 
 /* --- Habits --- */
 .habit-list {
@@ -750,13 +794,27 @@ input::placeholder {
     min-width: 4px;
 }
 
-.emotion-bar-fill.overwhelmed { background: var(--blush-pink); }
-.emotion-bar-fill.anxious { background: var(--soft-lavender); }
-.emotion-bar-fill.stuck { background: var(--warm-sand); }
-.emotion-bar-fill.stressed { background: var(--blush-pink); }
-.emotion-bar-fill.tired { background: var(--awareness-blue); }
-.emotion-bar-fill.calm { background: var(--action-green); }
-.emotion-bar-fill.default { background: var(--sage-green); }
+.emotion-bar-fill.overwhelmed {
+    background: linear-gradient(90deg, var(--emotion-overwhelmed) 0%, #EF5350 100%);
+}
+.emotion-bar-fill.anxious {
+    background: linear-gradient(90deg, var(--emotion-anxious) 0%, #AB47BC 100%);
+}
+.emotion-bar-fill.stuck {
+    background: linear-gradient(90deg, var(--emotion-stuck) 0%, #FB8C00 100%);
+}
+.emotion-bar-fill.stressed {
+    background: linear-gradient(90deg, var(--emotion-stressed) 0%, #E53935 100%);
+}
+.emotion-bar-fill.tired {
+    background: linear-gradient(90deg, var(--emotion-tired) 0%, #42A5F5 100%);
+}
+.emotion-bar-fill.calm {
+    background: linear-gradient(90deg, var(--emotion-calm) 0%, #66BB6A 100%);
+}
+.emotion-bar-fill.default {
+    background: linear-gradient(90deg, var(--sage-green) 0%, var(--sage-green-dark) 100%);
+}
 
 .emotion-bar-count {
     font-size: 0.8rem;
@@ -993,7 +1051,7 @@ input::placeholder {
 .landing-bg-base {
     position: fixed;
     inset: 0;
-    background: linear-gradient(145deg, var(--cream) 0%, #f5f0e8 50%, var(--bg-primary) 100%);
+    background: linear-gradient(145deg, #FFEEF1 0%, #FFF5F7 35%, #FFFBFC 70%, var(--bg-primary) 100%);
     z-index: 0;
 }
 
@@ -1002,8 +1060,8 @@ input::placeholder {
     inset: 0;
     background: radial-gradient(
         600px circle at var(--mouse-x, 50%) var(--mouse-y, 50%),
-        rgba(168, 181, 160, 0.12) 0%,
-        rgba(232, 221, 208, 0.08) 35%,
+        rgba(244, 165, 168, 0.15) 0%,
+        rgba(255, 212, 214, 0.10) 35%,
         transparent 70%
     );
     z-index: 1;
@@ -1194,48 +1252,50 @@ input::placeholder {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    background: var(--sage-green);
-    color: var(--text-primary);
+    background: linear-gradient(135deg, var(--sage-green-light) 0%, var(--sage-green) 50%, var(--sage-green-dark) 100%);
+    color: white;
     padding: 16px 52px;
     border-radius: var(--radius-pill);
     font-family: inherit;
     font-size: 1.1rem;
-    font-weight: 400;
+    font-weight: 500;
     text-decoration: none;
     letter-spacing: 0.3px;
     transition: all var(--transition-quick) var(--ease-calm);
-    box-shadow: 0 4px 20px rgba(168, 181, 160, 0.3);
+    box-shadow: 0 6px 24px rgba(127, 163, 114, 0.4);
 }
 
 .btn-landing-primary:hover {
-    background: var(--sage-green-dark);
-    color: var(--text-primary);
-    transform: translateY(-2px);
-    box-shadow: 0 8px 30px rgba(168, 181, 160, 0.4);
+    background: linear-gradient(135deg, var(--sage-green) 0%, var(--sage-green-dark) 50%, #4A7A3E 100%);
+    color: white;
+    transform: translateY(-3px);
+    box-shadow: 0 10px 35px rgba(127, 163, 114, 0.5);
 }
 
 .btn-landing-secondary {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    background: transparent;
-    color: var(--text-primary);
+    background: white;
+    color: var(--sage-green-dark);
     border: 2px solid var(--sage-green);
     padding: 14px 44px;
     border-radius: var(--radius-pill);
     font-family: inherit;
     font-size: 1.1rem;
-    font-weight: 400;
+    font-weight: 500;
     text-decoration: none;
     letter-spacing: 0.3px;
     transition: all var(--transition-quick) var(--ease-calm);
+    box-shadow: 0 2px 12px rgba(127, 163, 114, 0.15);
 }
 
 .btn-landing-secondary:hover {
-    background: var(--sage-green);
-    color: var(--text-primary);
-    transform: translateY(-2px);
-    box-shadow: 0 4px 20px rgba(168, 181, 160, 0.25);
+    background: linear-gradient(135deg, var(--sage-green-light) 0%, var(--sage-green) 100%);
+    color: white;
+    border-color: var(--sage-green-dark);
+    transform: translateY(-3px);
+    box-shadow: 0 6px 24px rgba(127, 163, 114, 0.3);
 }
 
 /* landing page bottom text */
@@ -1380,7 +1440,7 @@ input::placeholder {
 /* --- Illustration Panel (left side) --- */
 .auth-illustration {
     width: 45%;
-    background: linear-gradient(145deg, var(--sage-green) 0%, var(--sage-green-dark) 50%, #7A9A6E 100%);
+    background: linear-gradient(145deg, var(--sage-green-light) 0%, var(--sage-green) 40%, var(--sage-green-dark) 100%);
     display: flex;
     align-items: center;
     justify-content: center;
