@@ -170,35 +170,107 @@ def predict_emotion(text: str) -> str:
     return pred
 
 
-def get_reframe_and_affirmation(predicted_emotion: str):
-    # emotion supportive reframes + affirmations
+def extract_key_phrase(text: str) -> str:
+    """Extract a meaningful phrase from journal entry (up to 8 words)"""
+    import re
+    text = text.strip()
 
-    reframes = {
-        "overwhelmed": (
-            "It makes sense that you feel overwhelmed because you care and want to do well. "
-            "You can take things in tiny pieces and still move forward."
-        ),
-        "anxious": (
-            "You feel anxious because the outcome matters to you, not because you are failing. "
-            "You can calm your mind and take one small step."
-        ),
-        "stuck": (
-            "Feeling stuck doesn't mean you can't do it. "
-            "It just means the first step needs to be smaller and more approachable."
-        ),
-        "stressed": (
-            "You feel stressed because you are carrying a lot. "
-            "You can release the pressure and take things one small action at a time."
-        ),
-        "tired": (
-            "You feel tired because you have been pushing yourself mentally or emotionally. "
-            "Resting can help you come back with more clarity."
-        ),
-        "calm": (
-            "Feeling calm helps everything feel more manageable and within reach."
-        ),
-    }
+    # Look for meaningful phrases with emotional keywords
+    patterns = [
+        r"(too much\b[^.!?]{0,40})",
+        r"(don't know where to\b[^.!?]{0,40})",
+        r"(what if\b[^.!?]{0,40})",
+        r"(scared that\b[^.!?]{0,40})",
+        r"(worried\b[^.!?]{0,40})",
+        r"(deadline\b[^.!?]{0,40})",
+        r"(running out of time\b[^.!?]{0,40})",
+        r"(keep putting\b[^.!?]{0,40})",
+        r"(avoiding\b[^.!?]{0,40})",
+        r"(ended up\b[^.!?]{0,40})",
+        r"(no point\b[^.!?]{0,40})",
+        r"(never\b[^.!?]{0,40})",
+        r"(can't\b[^.!?]{0,30})",
+    ]
 
+    for pattern in patterns:
+        match = re.search(pattern, text, re.IGNORECASE)
+        if match:
+            phrase = match.group(1).strip()
+            words = phrase.split()[:8]
+            return ' '.join(words)
+
+    # Fallback: first 6-8 words
+    words = text.split()[:7]
+    return ' '.join(words)
+
+
+def generate_reframe(journal_text: str, emotion: str) -> str:
+    """
+    Generate emotionally intelligent reframe based on journal text and emotion.
+    Echoes user's words and provides specific perspective shift.
+    """
+    text_lower = journal_text.lower()
+    key_phrase = extract_key_phrase(journal_text)
+
+    # Map 'stuck' to avoidant-style reframes (current model doesn't have 'avoidant')
+    if emotion == "stuck":
+        emotion = "avoidant"
+
+    # Emotion-specific reframe patterns
+    if emotion == "overwhelmed":
+        if "don't know where" in text_lower or "where to start" in text_lower:
+            return f"The fact that you can list out what needs doing means it's not actually unknowable. Your brain just needs permission to do one thing at a time instead of holding all of it at once."
+        elif "too much" in text_lower or "piling up" in text_lower:
+            return f"When you say '{key_phrase}', your brain is trying to hold everything at once. Pick the smallest task or the nearest deadline — either answer breaks the freeze."
+        else:
+            return "You're seeing all the tasks as one giant thing instead of separate small actions. Your brain doesn't need to solve everything right now — just the next single step."
+
+    elif emotion == "anxious":
+        if "what if" in text_lower:
+            return f"Your brain is running disaster simulations on repeat because it thinks preparing for the worst will prevent it. But '{key_phrase}' isn't a question that has an answer right now — it's just anxiety looking for something to hold onto."
+        elif "fail" in text_lower or "mess up" in text_lower or "scared" in text_lower:
+            return f"The fear you're feeling isn't a preview of what will happen — it's just your nervous system treating the future like it's already here. You can't control the outcome, but you can control what you do in the next ten minutes."
+        elif "everyone else" in text_lower or "prepared" in text_lower:
+            return "Comparing your internal panic to everyone else's external appearance makes the gap feel bigger than it is. Their calm doesn't mean you're failing — it just means you can't see their nerves."
+        else:
+            return "Worry feels productive because it keeps your brain busy, but it's not preparation — it's just loops. You don't need certainty to take one small action."
+
+    elif emotion == "stressed":
+        if "deadline" in text_lower or "hours" in text_lower or "running out" in text_lower:
+            return f"The time pressure is making everything feel impossible, but you've already done something under the worst conditions. Your brain doesn't need clarity right now — it just needs you to keep your hands moving for the next hour."
+        elif "pressure" in text_lower or "can't focus" in text_lower:
+            return "The racing feeling is your body's stress response, not a reflection of what's actually possible. You don't need to feel calm to make progress — you just need to move your hands while your heart races."
+        else:
+            return "Urgency makes your brain think everything has to be perfect immediately. But messy progress made under pressure still counts as progress."
+
+    elif emotion == "avoidant":
+        if "later" in text_lower or "tomorrow" in text_lower or "maybe" in text_lower:
+            return f"Mental tiredness often shows up right when you're about to do something that requires thinking, then mysteriously lifts when you're doing something easier. You might not need rest — you might just need to open the file for two minutes without expecting yourself to finish."
+        elif "avoiding" in text_lower or "putting it off" in text_lower or "three days" in text_lower:
+            return f"Avoidance tells you the task feels like something you need to be 'ready' for. You don't need to do it well or even finish it. You just need to do one small piece badly and see what happens next."
+        elif "ended up" in text_lower or "instead" in text_lower:
+            return "The phone and the distractions aren't signs you can't do this — they're just your brain's way of avoiding discomfort. You don't need to feel motivated to begin; you just need to start before you feel ready."
+        else:
+            return "You already know what to do — that's not the problem. The problem is your brain is waiting for the 'right' feeling that never comes. Start messy. Start badly. Just start."
+
+    elif emotion == "discouraged":
+        if "no point" in text_lower or "what's the point" in text_lower:
+            return f"When you say '{key_phrase}', you're measuring success by outcomes you can't control yet. Showing up is the point. Trying is the point. Those count even when the results aren't visible yet."
+        elif "never" in text_lower or "always" in text_lower:
+            return "You're measuring improvement by looking at single moments in isolation instead of across time. Progress isn't linear — sometimes you only see it when you look backward, not when you're in the middle."
+        else:
+            return "The gap between where you are and where you want to be only exists because you're learning what 'better' looks like. That gap is proof you're growing, not proof you're failing."
+
+    elif emotion == "calm":
+        return "This clarity you're feeling right now is worth noticing. You don't need to rush to capitalize on it — just take the next small step while it's here."
+
+    else:
+        # neutral or unrecognized
+        return "You showed up and wrote this down — that's already movement. You don't need to have it all figured out to take one small next step."
+
+
+def get_affirmation(predicted_emotion: str) -> str:
+    """Return identity-based affirmation for given emotion"""
     affirmations = {
         "overwhelmed": "I can take this slowly and still make progress.",
         "anxious": "I can steady myself and begin gently.",
@@ -207,15 +279,7 @@ def get_reframe_and_affirmation(predicted_emotion: str):
         "tired": "I am allowed to pause without losing progress.",
         "calm": "I am becoming the version of myself I imagined.",
     }
-
-    default_reframe = (
-        "Whatever I am feeling right now is valid and I can still take one tiny step."
-    )
-    default_affirmation = "I am doing my best and that is enough."
-
-    reframe = reframes.get(predicted_emotion, default_reframe)
-    affirmation = affirmations.get(predicted_emotion, default_affirmation)
-    return reframe, affirmation
+    return affirmations.get(predicted_emotion, "I am doing my best and that is enough.")
 
 
 def get_alignment_state(user_id):
@@ -411,7 +475,7 @@ def dashboard():
     today_affirmation = None
     if last_entry:
         _, emotion, _ = last_entry
-        _, today_affirmation = get_reframe_and_affirmation(emotion)
+        today_affirmation = get_affirmation(emotion)
 
     return render_template(
         "dashboard.html",
@@ -436,7 +500,8 @@ def journal():
 
         if entry_text:
             predicted_emotion = predict_emotion(entry_text)
-            reframe, affirmation = get_reframe_and_affirmation(predicted_emotion)
+            reframe = generate_reframe(entry_text, predicted_emotion)
+            affirmation = get_affirmation(predicted_emotion)
 
             conn = get_db_connection()
             cur = conn.cursor()
