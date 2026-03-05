@@ -45,6 +45,16 @@
             </p>
         </div>
 
+        <!-- show streak if exists -->
+        {% if emotional_streak and emotional_streak > 0 %}
+        <div style="text-align: center; margin-bottom: var(--space-md);" class="fade-in-up">
+            <span class="streak-display">
+                <span class="streak-emoji">🔥</span>
+                <span><span class="streak-number">{{ emotional_streak }}</span> day{{ 's' if emotional_streak != 1 }} streak</span>
+            </span>
+        </div>
+        {% endif %}
+
         <!-- journal form -->
         <form method="post" class="fade-in-up">
             <div class="form-group">
@@ -106,6 +116,18 @@
         </div>
         {% endif %}
 
+        <!-- next step guidance (shown after a reflection is submitted) -->
+        {% if predicted_emotion %}
+        <div class="next-steps-card fade-in-up">
+            <p class="next-steps-label">You have reflected. What would you like to do next?</p>
+            <div class="next-steps-actions">
+                <a href="{{ url_for('today') }}" class="btn-calm">Return to Today</a>
+                <a href="{{ url_for('habits') }}" class="btn-gentle">Check your habits</a>
+                <a href="{{ url_for('analytics') }}" class="btn-gentle">View patterns</a>
+            </div>
+        </div>
+        {% endif %}
+
         <!-- past reflections -->
         <hr class="divider">
 
@@ -164,9 +186,11 @@
             {% endfor %}
         </ul>
         {% else %}
-        <p class="empty-state">
-            Your first reflection will appear here when you are ready.
-        </p>
+        <div class="empty-state-enhanced">
+            <div class="empty-state-icon">✍️</div>
+            <p>Your first reflection will appear here when you are ready.</p>
+            <p style="margin-top: 8px; font-size: 0.85rem;">Take your time — there's no pressure to start.</p>
+        </div>
         {% endif %}
 
     </main>

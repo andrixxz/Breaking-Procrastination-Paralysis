@@ -856,6 +856,66 @@ input::placeholder {
     to { opacity: 1; }
 }
 
+@keyframes checkmarkPop {
+    0% {
+        transform: scale(0.5);
+        opacity: 0;
+    }
+    50% {
+        transform: scale(1.2);
+    }
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+@keyframes celebrationPulse {
+    0%, 100% {
+        transform: scale(1);
+        box-shadow: 0 4px 12px rgba(127, 163, 114, 0.25);
+    }
+    50% {
+        transform: scale(1.05);
+        box-shadow: 0 8px 24px rgba(127, 163, 114, 0.4);
+    }
+}
+
+@keyframes slideInRight {
+    from {
+        opacity: 0;
+        transform: translateX(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@keyframes confettiPop {
+    0% {
+        opacity: 0;
+        transform: translateY(0) scale(0);
+    }
+    50% {
+        opacity: 1;
+        transform: translateY(-40px) scale(1);
+    }
+    100% {
+        opacity: 0;
+        transform: translateY(-80px) scale(0.5);
+    }
+}
+
+@keyframes streakGlow {
+    0%, 100% {
+        box-shadow: 0 0 10px rgba(244, 165, 168, 0.3);
+    }
+    50% {
+        box-shadow: 0 0 20px rgba(244, 165, 168, 0.6);
+    }
+}
+
 .fade-in {
     animation: fadeIn var(--transition-slow) var(--ease-calm);
 }
@@ -872,8 +932,304 @@ input::placeholder {
 .stagger-children > *:nth-child(3) { animation-delay: 0.15s; }
 .stagger-children > *:nth-child(4) { animation-delay: 0.2s; }
 .stagger-children > *:nth-child(5) { animation-delay: 0.25s; }
+.stagger-children > *:nth-child(6) { animation-delay: 0.3s; }
+.stagger-children > *:nth-child(7) { animation-delay: 0.35s; }
+.stagger-children > *:nth-child(8) { animation-delay: 0.4s; }
 
-/* --- Cursor Glow (subtle, desktop only) --- */
+/* --- Gamification Features --- */
+
+/* Streak Counter */
+.streak-display {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: linear-gradient(135deg, rgba(244, 165, 168, 0.12), rgba(168, 170, 219, 0.12));
+    padding: 10px 18px;
+    border-radius: var(--radius-pill);
+    font-size: 0.95rem;
+    color: var(--text-primary);
+    font-weight: 400;
+    animation: streakGlow 3s ease-in-out infinite;
+    border: 1px solid rgba(244, 165, 168, 0.2);
+}
+
+.streak-emoji {
+    font-size: 1.2rem;
+    animation: gentleFloat 4s ease-in-out infinite;
+}
+
+.streak-number {
+    font-weight: 600;
+    color: var(--sage-green-dark);
+}
+
+/* Weekly Summary Card */
+.weekly-summary {
+    background: linear-gradient(135deg, rgba(127, 163, 114, 0.08), rgba(212, 175, 106, 0.08));
+    border: 1px solid rgba(127, 163, 114, 0.2);
+    border-radius: var(--radius-lg);
+    padding: var(--space-md);
+    margin-bottom: var(--space-md);
+}
+
+.weekly-summary-header {
+    font-family: 'Lora', Georgia, serif;
+    font-size: 1.1rem;
+    color: var(--text-primary);
+    margin-bottom: var(--space-sm);
+}
+
+.weekly-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-sm);
+    margin-bottom: var(--space-sm);
+}
+
+.weekly-stat {
+    text-align: center;
+    padding: var(--space-sm);
+    background: rgba(255, 255, 255, 0.5);
+    border-radius: var(--radius-md);
+}
+
+.weekly-stat-value {
+    font-family: 'Lora', Georgia, serif;
+    font-size: 1.8rem;
+    font-weight: 600;
+    color: var(--sage-green-dark);
+    margin-bottom: 4px;
+}
+
+.weekly-stat-label {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.weekly-encouragement {
+    text-align: center;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    font-style: italic;
+    margin-top: var(--space-sm);
+}
+
+/* Progress Circles/Rings */
+.progress-ring {
+    position: relative;
+    width: 80px;
+    height: 80px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.progress-ring-circle {
+    transform: rotate(-90deg);
+    transform-origin: 50% 50%;
+}
+
+.progress-ring-bg {
+    fill: none;
+    stroke: var(--bg-secondary);
+    stroke-width: 4;
+}
+
+.progress-ring-fill {
+    fill: none;
+    stroke: var(--sage-green);
+    stroke-width: 4;
+    stroke-linecap: round;
+    transition: stroke-dashoffset 0.8s var(--ease-calm);
+}
+
+.progress-ring-text {
+    position: absolute;
+    font-family: 'Lora', Georgia, serif;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+/* Completion Celebration */
+.completion-celebration {
+    background: linear-gradient(135deg, rgba(129, 199, 132, 0.15), rgba(127, 163, 114, 0.15));
+    border: 1px solid rgba(127, 163, 114, 0.3);
+    border-radius: var(--radius-lg);
+    padding: var(--space-md);
+    text-align: center;
+    animation: celebrationPulse 2s ease-in-out 3;
+    margin-bottom: var(--space-md);
+}
+
+.celebration-emoji {
+    font-size: 2.5rem;
+    display: block;
+    margin-bottom: var(--space-sm);
+    animation: checkmarkPop 0.6s var(--ease-calm);
+}
+
+.celebration-text {
+    font-family: 'Lora', Georgia, serif;
+    font-size: 1.2rem;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+}
+
+.celebration-subtext {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+
+/* Enhanced Checkbox Animation */
+.habit-checkbox:checked,
+.todo-checkbox:checked {
+    animation: checkmarkPop 0.4s var(--ease-calm);
+}
+
+/* Todo List Styles */
+.todo-list {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 var(--space-md);
+}
+
+.todo-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: 12px var(--space-sm);
+    border-radius: var(--radius-md);
+    transition: all var(--transition-quick) var(--ease-calm);
+    margin-bottom: 4px;
+}
+
+.todo-item:hover {
+    background: rgba(168, 181, 160, 0.06);
+}
+
+.todo-item.completed {
+    opacity: 0.6;
+}
+
+.todo-checkbox {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 2px solid var(--warm-sand);
+    appearance: none;
+    -webkit-appearance: none;
+    cursor: pointer;
+    transition: all var(--transition-quick) var(--ease-calm);
+    flex-shrink: 0;
+    background: var(--bg-card);
+}
+
+.todo-checkbox:checked {
+    background: var(--sage-green);
+    border-color: var(--sage-green);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 12'/%3E%3C/svg%3E");
+    background-size: 14px;
+    background-position: center;
+    background-repeat: no-repeat;
+}
+
+.todo-checkbox:hover {
+    border-color: var(--sage-green);
+}
+
+.todo-text {
+    font-size: 0.95rem;
+    color: var(--text-primary);
+    font-weight: 300;
+    flex: 1;
+}
+
+.todo-item.completed .todo-text {
+    text-decoration: line-through;
+    color: var(--text-muted);
+}
+
+.todo-source-tag {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    background: var(--bg-secondary);
+    padding: 2px 8px;
+    border-radius: var(--radius-pill);
+}
+
+.todo-date {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+/* Milestone Badge */
+.milestone-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: linear-gradient(135deg, var(--alignment-gold), var(--warm-sand));
+    padding: 6px 14px;
+    border-radius: var(--radius-pill);
+    font-size: 0.8rem;
+    color: var(--text-primary);
+    font-weight: 500;
+    box-shadow: 0 2px 8px rgba(212, 175, 106, 0.3);
+    animation: slideInRight 0.6s var(--ease-calm);
+}
+
+/* Week Days Progress */
+.week-days {
+    display: flex;
+    gap: 6px;
+    justify-content: center;
+    margin: var(--space-sm) 0;
+}
+
+.week-day {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--bg-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    font-weight: 500;
+    transition: all var(--transition-quick) var(--ease-calm);
+}
+
+.week-day.active {
+    background: var(--sage-green);
+    color: white;
+    box-shadow: 0 2px 8px rgba(127, 163, 114, 0.3);
+}
+
+.week-day.today {
+    border: 2px solid var(--sage-green);
+    font-weight: 600;
+}
+
+/* Empty State with Icon */
+.empty-state-enhanced {
+    text-align: center;
+    padding: var(--space-xl) var(--space-md);
+    color: var(--text-muted);
+}
+
+.empty-state-icon {
+    font-size: 3rem;
+    margin-bottom: var(--space-sm);
+    opacity: 0.3;
+}
+
+.empty-state-enhanced p {
+    font-size: 0.95rem;
+    line-height: 1.6;
+}
+
+/* Cursor Glow (subtle, desktop only) --- */
 .cursor-glow {
     position: fixed;
     width: 220px;
@@ -1701,4 +2057,159 @@ input::placeholder {
 .nav-links .logout-link:hover {
     color: var(--blush-pink);
     border-bottom-color: var(--blush-pink);
+}
+
+
+/* ============================================
+   New Component Styles — Identity, Beliefs, Next Steps
+   ============================================ */
+
+/* --- Identity Section (Dashboard) --- */
+.identity-section {
+    padding: 28px;
+    margin-bottom: var(--space-md);
+}
+
+.identity-section-header {
+    margin-bottom: var(--space-md);
+    padding-bottom: var(--space-sm);
+    border-bottom: 1px solid rgba(0,0,0,0.05);
+}
+
+.goal-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.goal-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+}
+
+.goal-bullet {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--sage-green);
+    flex-shrink: 0;
+    margin-top: 8px;
+}
+
+.goal-text {
+    font-size: 1rem;
+    color: var(--text-primary);
+    line-height: 1.6;
+}
+
+/* --- Belief List (Dashboard) --- */
+.belief-list {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.belief-item {
+    background: var(--cream);
+    border-radius: var(--radius-md);
+    padding: 16px 20px;
+    border-left: 3px solid var(--soft-lavender);
+}
+
+.belief-text {
+    font-family: 'Lora', Georgia, serif;
+    font-size: 1.05rem;
+    font-style: italic;
+    color: var(--text-primary);
+    line-height: 1.6;
+    margin-bottom: 6px;
+}
+
+.belief-goal-link {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin: 0;
+}
+
+/* --- Daily Belief Reminder (Today page) --- */
+.belief-reminder {
+    background: linear-gradient(135deg, var(--cream) 0%, var(--blush-pink-light) 100%);
+    border-radius: var(--radius-lg);
+    padding: 20px 24px;
+    margin-bottom: var(--space-md);
+    border: 1px solid rgba(168, 170, 219, 0.25);
+    text-align: center;
+}
+
+.belief-reminder-label {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin-bottom: 8px;
+}
+
+.belief-reminder-text {
+    font-family: 'Lora', Georgia, serif;
+    font-size: 1.1rem;
+    font-style: italic;
+    color: var(--text-primary);
+    line-height: 1.6;
+    margin: 0;
+}
+
+/* --- Habit Goal Context (Habits page) --- */
+.habit-name-text {
+    display: block;
+    color: var(--text-primary);
+}
+
+.habit-goal-context {
+    display: block;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    margin-top: 2px;
+    font-style: italic;
+}
+
+/* --- Next Steps Card (Journal page) --- */
+.next-steps-card {
+    background: var(--bg-secondary);
+    border-radius: var(--radius-lg);
+    padding: 24px;
+    margin: var(--space-md) 0;
+    text-align: center;
+}
+
+.next-steps-label {
+    font-size: 0.95rem;
+    color: var(--text-secondary);
+    margin-bottom: var(--space-md);
+}
+
+.next-steps-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+/* --- Metric Grid 3-column (Dashboard) --- */
+.metric-grid:has(.metric-card:nth-child(3)) {
+    grid-template-columns: repeat(3, 1fr);
+}
+
+@media (max-width: 600px) {
+    .metric-grid:has(.metric-card:nth-child(3)) {
+        grid-template-columns: 1fr;
+    }
+    .next-steps-actions {
+        flex-direction: column;
+        align-items: center;
+    }
 }

@@ -40,8 +40,8 @@
         <div class="section-header fade-in-up">
             <h1 class="section-title">Tiny Steps</h1>
             <p class="section-subtitle">
-                Small steps are still steps forward.
-                These are gentle, realistic actions that support who you are becoming.
+                Each habit below is a small action tied to one of your goals.
+                Completing them consistently is how identity shifts — one day at a time.
             </p>
         </div>
 
@@ -61,9 +61,12 @@
                         id="habit-{{ h['id'] }}"
                     >
                     <label class="habit-label" for="habit-{{ h['id'] }}">
-                        {{ h["name"] }}
+                        <span class="habit-name-text">{{ h["name"] }}</span>
                         {% if h["is_sample"] %}
                             <span class="habit-tag">suggestion</span>
+                        {% endif %}
+                        {% if h["goal_text"] %}
+                        <span class="habit-goal-context">Supports: {{ h["goal_text"] }}</span>
                         {% endif %}
                     </label>
                 </li>
@@ -71,7 +74,11 @@
             </ul>
             <button type="submit" class="btn-calm">Acknowledge progress</button>
             {% else %}
-            <p class="empty-state">No tiny steps yet. Add one below when you feel ready.</p>
+            <div class="empty-state-enhanced">
+                <div class="empty-state-icon">🌱</div>
+                <p>No tiny steps yet.</p>
+                <p style="margin-top: 8px; font-size: 0.85rem;">Add one below when you feel ready — it can be something very small.</p>
+            </div>
             {% endif %}
         </form>
 

@@ -29,11 +29,58 @@
 
     <main class="page-content stagger-children">
 
-        <!-- greeting -->
+        <!-- greeting with streak -->
         <div class="greeting">
             <h1 class="greeting-text">{{ greeting }}</h1>
             <p class="greeting-sub">Here is what you have on your plate today.</p>
+            {% if emotional_streak > 0 %}
+            <div style="margin-top: 12px;">
+                <span class="streak-display">
+                    <span class="streak-emoji">🔥</span>
+                    <span><span class="streak-number">{{ emotional_streak }}</span> day{{ 's' if emotional_streak != 1 }} of reflection</span>
+                </span>
+            </div>
+            {% endif %}
         </div>
+
+        <!-- daily identity belief reminder -->
+        {% if today_belief %}
+        <div class="belief-reminder fade-in-up">
+            <p class="belief-reminder-label">Today's identity reminder</p>
+            <p class="belief-reminder-text">&ldquo;{{ today_belief }}&rdquo;</p>
+        </div>
+        {% endif %}
+
+        <!-- weekly summary card -->
+        {% if show_weekly_summary %}
+        <div class="weekly-summary">
+            <h3 class="weekly-summary-header">This Week's Journey</h3>
+
+            <!-- week days indicator -->
+            <div class="week-days">
+                {% for day in week_days %}
+                <div class="week-day {{ 'active' if day.active else '' }} {{ 'today' if day.is_today else '' }}" title="{{ day.name }}">
+                    {{ day.initial }}
+                </div>
+                {% endfor %}
+            </div>
+
+            <div class="weekly-stats">
+                <div class="weekly-stat">
+                    <div class="weekly-stat-value">{{ active_days_this_week }}</div>
+                    <div class="weekly-stat-label">Reflections</div>
+                </div>
+                <div class="weekly-stat">
+                    <div class="weekly-stat-value">{{ habits_done_this_week }}</div>
+                    <div class="weekly-stat-label">Tiny actions</div>
+                </div>
+            </div>
+
+            {% if weekly_message %}
+            <p class="weekly-encouragement">{{ weekly_message }}</p>
+            {% endif %}
+        </div>
+        {% endif %}
 
         <!-- quick stats -->
         <div class="metric-grid">
@@ -42,10 +89,19 @@
                 <p class="metric-label">Alignment Score</p>
             </div>
             <div class="card metric-card">
-                <span class="metric-value">{{ emotional_streak }}</span>
-                <p class="metric-label">Day Streak</p>
+                <span class="metric-value">{{ habits_completed_today }}/{{ total_habits }}</span>
+                <p class="metric-label">Today's Habits</p>
             </div>
         </div>
+
+        <!-- celebration when all habits completed -->
+        {% if all_habits_completed and total_habits > 0 %}
+        <div class="completion-celebration">
+            <span class="celebration-emoji">✨</span>
+            <p class="celebration-text">You completed all your tiny steps today!</p>
+            <p class="celebration-subtext">"I am becoming the version of myself I imagined."</p>
+        </div>
+        {% endif %}
 
         <!-- today's to-do list -->
         <div class="card" style="padding: 24px;">

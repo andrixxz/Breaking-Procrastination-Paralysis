@@ -2,25 +2,16 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>Your Space – Breaking Procrastination Paralysis</title>
+    <title>Your Identity – Breaking Procrastination Paralysis</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-
-    <!-- fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500&family=Lora:ital,wght@0,400;0,500;1,400&display=swap"
-        rel="stylesheet"
-    >
-
-    <!-- design system -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500&family=Lora:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='calm.css') }}">
 </head>
-
 <body>
 <div class="page-wrapper">
 
-    <!-- navigation -->
     <nav class="page-nav">
         <a href="{{ url_for('dashboard') }}" class="nav-brand">Breaking Procrastination Paralysis</a>
         <ul class="nav-links">
@@ -33,59 +24,88 @@
         </ul>
     </nav>
 
-    <!-- main content -->
     <main class="page-content stagger-children">
 
         <!-- greeting -->
         <div class="greeting">
-            <h1 class="greeting-text">{{ greeting }}</h1>
-            <p class="greeting-sub">Here is a gentle overview of how you are doing.</p>
+            <h1 class="greeting-text">{{ greeting }}, {{ session.username }}</h1>
+            <p class="greeting-sub">This is who you are becoming.</p>
         </div>
 
-        <!-- metrics -->
-        <div class="metric-grid">
-
-            <!-- alignment score with breathing circle -->
-            <div class="card metric-card">
-                <div class="alignment-circle-wrapper">
-                    <div class="alignment-circle" style="--progress: {{ [alignment_score, 100] | min }};">
-                        <div class="alignment-circle-inner">
-                            <span class="metric-value">{{ alignment_score }}</span>
-                        </div>
-                    </div>
-                </div>
-                <p class="metric-label">Identity Alignment Score</p>
-                <small>Grows with journaling and gentle actions</small>
+        <!-- goals section -->
+        {% if goals %}
+        <div class="card identity-section fade-in-up">
+            <div class="identity-section-header">
+                <h2>What you are working towards</h2>
+                <p class="section-subtitle">The goals you set when you started this journey.</p>
             </div>
+            <ul class="goal-list">
+                {% for goal in goals %}
+                <li class="goal-item">
+                    <span class="goal-bullet"></span>
+                    <span class="goal-text">{{ goal.goal_text }}</span>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
 
-            <!-- emotional streak -->
+        <!-- identity beliefs section -->
+        {% if beliefs %}
+        <div class="card identity-section fade-in-up">
+            <div class="identity-section-header">
+                <h2>Who you are becoming</h2>
+                <p class="section-subtitle">Your identity beliefs — the person you committed to being when you started.</p>
+            </div>
+            <div class="belief-list">
+                {% for belief in beliefs %}
+                <div class="belief-item">
+                    <p class="belief-text">&ldquo;{{ belief.belief_text }}&rdquo;</p>
+                    {% if belief.goal_text %}
+                    <p class="belief-goal-link">Supports: {{ belief.goal_text }}</p>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- affirmation based on last journal -->
+        {% if today_affirmation %}
+        <div class="card card-affirmation fade-in-up">
+            <p>&ldquo;{{ today_affirmation }}&rdquo;</p>
+            <small>Based on your last reflection</small>
+        </div>
+        {% endif %}
+
+        <!-- stats row -->
+        <div class="metric-grid">
+            <div class="card metric-card">
+                <span class="metric-value">{{ alignment_score }}</span>
+                <p class="metric-label">Alignment Score</p>
+                <small>Grows with every reflection and action</small>
+            </div>
             <div class="card metric-card">
                 <span class="metric-value">{{ emotional_streak }}</span>
-                <p class="metric-label">Emotional Streak</p>
-                <small>Days you have checked in with yourself</small>
-                {% if emotional_streak > 0 %}
-                <div style="margin-top: 12px;">
-                    <span class="streak-badge">{{ emotional_streak }} day{{ 's' if emotional_streak != 1 }} of showing up</span>
-                </div>
-                {% endif %}
+                <p class="metric-label">Day Streak</p>
+                <small>Consecutive days of checking in</small>
             </div>
-
-        </div>
-
-        <!-- affirmation of the day -->
-        <div class="card card-affirmation">
-            {% if today_affirmation %}
-                <p>"{{ today_affirmation }}"</p>
-                <small>Your affirmation, based on your last reflection</small>
-            {% else %}
-                <p>Your affirmation will appear here once you write your first reflection.</p>
-                <small>No pressure. Start when it feels right.</small>
-            {% endif %}
+            <div class="card metric-card">
+                <span class="metric-value">{{ journal_count }}</span>
+                <p class="metric-label">Reflections</p>
+                <small>Times you have shown up</small>
+            </div>
         </div>
 
         <!-- navigation actions -->
         <div class="nav-actions">
-
+            <a href="{{ url_for('today') }}" class="nav-action-link">
+                <span class="action-icon icon-action">.</span>
+                <span class="action-text">
+                    <span class="action-label">Go to Today</span>
+                    <span class="action-hint">Tasks, habits, your daily space</span>
+                </span>
+            </a>
             <a href="{{ url_for('journal') }}" class="nav-action-link">
                 <span class="action-icon icon-awareness">~</span>
                 <span class="action-text">
@@ -93,15 +113,6 @@
                     <span class="action-hint">Awareness journaling</span>
                 </span>
             </a>
-
-            <a href="{{ url_for('habits') }}" class="nav-action-link">
-                <span class="action-icon icon-action">.</span>
-                <span class="action-text">
-                    <span class="action-label">View tiny steps</span>
-                    <span class="action-hint">Small, realistic actions</span>
-                </span>
-            </a>
-
             <a href="{{ url_for('analytics') }}" class="nav-action-link">
                 <span class="action-icon icon-patterns">*</span>
                 <span class="action-text">
@@ -109,28 +120,19 @@
                     <span class="action-hint">Emotional insights</span>
                 </span>
             </a>
-
         </div>
 
     </main>
 
 </div>
 
-<!-- cursor glow effect -->
 <div class="cursor-glow" id="cursorGlow"></div>
 <script>
 (function() {
     const glow = document.getElementById('cursorGlow');
     if (!glow || window.innerWidth < 768) return;
-
-    let mouseX = -300, mouseY = -300;
-    let glowX = -300, glowY = -300;
-
-    document.addEventListener('mousemove', function(e) {
-        mouseX = e.clientX;
-        mouseY = e.clientY;
-    });
-
+    let mouseX = -300, mouseY = -300, glowX = -300, glowY = -300;
+    document.addEventListener('mousemove', function(e) { mouseX = e.clientX; mouseY = e.clientY; });
     function animate() {
         glowX += (mouseX - glowX) * 0.12;
         glowY += (mouseY - glowY) * 0.12;

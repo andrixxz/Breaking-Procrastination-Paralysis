@@ -51,11 +51,21 @@
             <div class="card pattern-card">
                 <p class="pattern-value">{{ active_days }}</p>
                 <p class="pattern-label">Days you reflected this week</p>
+                {% if active_days >= 5 %}
+                <div style="margin-top: 8px;">
+                    <span class="milestone-badge">⭐ Consistent</span>
+                </div>
+                {% endif %}
             </div>
 
             <div class="card pattern-card">
                 <p class="pattern-value">{{ habits_done }}</p>
                 <p class="pattern-label">Tiny actions completed this week</p>
+                {% if habits_done >= 10 %}
+                <div style="margin-top: 8px;">
+                    <span class="milestone-badge">🎯 Momentum</span>
+                </div>
+                {% endif %}
             </div>
 
         </div>
@@ -84,9 +94,13 @@
                 {% endfor %}
             </ul>
             {% else %}
-            <p class="empty-state">
-                Emotion patterns will appear here after your first few reflections.
-            </p>
+            <div class="empty-state-enhanced">
+                <div class="empty-state-icon">📊</div>
+                <p>Emotion patterns will appear here after your first few reflections.</p>
+                <p style="margin-top: 8px;">
+                    <a href="{{ url_for('journal') }}" class="btn-text">Start reflecting</a>
+                </p>
+            </div>
             {% endif %}
         </div>
 

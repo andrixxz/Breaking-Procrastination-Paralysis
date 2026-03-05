@@ -799,75 +799,80 @@ def get_affirmation(predicted_emotion: str) -> str:
 def get_alignment_state(user_id):
     # returns alignment score + streak for a specific user
     conn = get_db_connection()
-    cur = conn.cursor()
-    cur.execute(
-        "SELECT alignment_score, emotional_streak, last_journal_date "
-        "FROM alignment_state WHERE user_id = ?;",
-        (user_id,),
-    )
-    row = cur.fetchone()
-    conn.close()
-    if row is None:
-        return 0, 0, None
-    return row["alignment_score"], row["emotional_streak"], row["last_journal_date"]
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT alignment_score, emotional_streak, last_journal_date "
+            "FROM alignment_state WHERE user_id = ?;",
+            (user_id,),
+        )
+        row = cur.fetchone()
+        if row is None:
+            return 0, 0, None
+        return row["alignment_score"], row["emotional_streak"], row["last_journal_date"]
+    finally:
+        conn.close()
 
 
 def update_alignment_score(user_id, delta: int):
     # increase or reduce score but never below zero
     conn = get_db_connection()
-    cur = conn.cursor()
-    cur.execute(
-        "UPDATE alignment_state "
-        "SET alignment_score = MAX(alignment_score + ?, 0) "
-        "WHERE user_id = ?;",
-        (delta, user_id),
-    )
-    conn.commit()
-    conn.close()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "UPDATE alignment_state "
+            "SET alignment_score = MAX(alignment_score + ?, 0) "
+            "WHERE user_id = ?;",
+            (delta, user_id),
+        )
+        conn.commit()
+    finally:
+        conn.close()
 
 
 def update_emotional_streak_for_today(user_id):
     # journals on consecutive days then streak increases, skip a day resets
     today = date.today()
     conn = get_db_connection()
-    cur = conn.cursor()
-    cur.execute(
-        "SELECT emotional_streak, last_journal_date FROM alignment_state WHERE user_id = ?;",
-        (user_id,),
-    )
-    row = cur.fetchone()
-    if row is None:
-        conn.close()
-        return
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT emotional_streak, last_journal_date FROM alignment_state WHERE user_id = ?;",
+            (user_id,),
+        )
+        row = cur.fetchone()
+        if row is None:
+            return
 
-    streak = row["emotional_streak"]
-    last_str = row["last_journal_date"]
+        streak = row["emotional_streak"]
+        last_str = row["last_journal_date"]
 
-    if last_str is None:
-        # first ever journal
-        streak = 1
-    else:
-        try:
-            last_date = date.fromisoformat(last_str)
-            if last_date == today:
-                # already counted today, leave streak as is
-                pass
-            elif last_date == today - timedelta(days=1):
-                # journalled yesterday, so streak continues
-                streak += 1
-            else:
-                # gap in days, streak resets
-                streak = 1
-        except ValueError:
+        if last_str is None:
+            # first ever journal
             streak = 1
+        else:
+            try:
+                last_date = date.fromisoformat(last_str)
+                if last_date == today:
+                    # already counted today, leave streak as is
+                    pass
+                elif last_date == today - timedelta(days=1):
+                    # journalled yesterday, so streak continues
+                    streak += 1
+                else:
+                    # gap in days, streak resets
+                    streak = 1
+            except ValueError:
+                streak = 1
 
-    cur.execute(
-        "UPDATE alignment_state SET emotional_streak = ?, last_journal_date = ? "
-        "WHERE user_id = ?;",
-        (streak, today.isoformat(), user_id),
-    )
-    conn.commit()
-    conn.close()
+        cur.execute(
+            "UPDATE alignment_state SET emotional_streak = ?, last_journal_date = ? "
+            "WHERE user_id = ?;",
+            (streak, today.isoformat(), user_id),
+        )
+        conn.commit()
+    finally:
+        conn.close()
 
 
 # routes - authentication
@@ -985,6 +990,22 @@ def dashboard():
         (user_id,),
     )
     last_entry = cur.fetchone()
+
+    cur.execute("SELECT id, goal_text FROM goals WHERE user_id = ? ORDER BY id ASC", (user_id,))
+    goals = cur.fetchall()
+
+    cur.execute("""
+        SELECT ib.belief_text, g.goal_text
+        FROM identity_beliefs ib
+        LEFT JOIN goals g ON ib.linked_goal_id = g.id
+        WHERE ib.user_id = ?
+        ORDER BY ib.id ASC
+    """, (user_id,))
+    beliefs = cur.fetchall()
+
+    cur.execute("SELECT COUNT(*) as count FROM journal_entries WHERE user_id = ?", (user_id,))
+    journal_count = cur.fetchone()["count"]
+
     conn.close()
 
     today_affirmation = None
@@ -998,6 +1019,9 @@ def dashboard():
         alignment_score=alignment_score,
         emotional_streak=emotional_streak,
         today_affirmation=today_affirmation,
+        goals=goals,
+        beliefs=beliefs,
+        journal_count=journal_count,
     )
 
 # main journaling page
@@ -1023,18 +1047,20 @@ def journal():
             micro_task = generate_micro_task(entry_text, predicted_emotion)
 
             conn = get_db_connection()
-            cur = conn.cursor()
-            cur.execute(
-                "INSERT INTO journal_entries "
-                "(user_id, entry_text, predicted_emotion, reframe, micro_task_text, micro_task_minutes, created_at) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (user_id, entry_text, predicted_emotion, reframe,
-                 micro_task['task_text'], micro_task['estimated_minutes'],
-                 datetime.now().isoformat(timespec="seconds")),
-            )
-            conn.commit()
-            new_entry_id = cur.lastrowid
-            conn.close()
+            try:
+                cur = conn.cursor()
+                cur.execute(
+                    "INSERT INTO journal_entries "
+                    "(user_id, entry_text, predicted_emotion, reframe, micro_task_text, micro_task_minutes, created_at) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    (user_id, entry_text, predicted_emotion, reframe,
+                     micro_task['task_text'], micro_task['estimated_minutes'],
+                     datetime.now().isoformat(timespec="seconds")),
+                )
+                conn.commit()
+                new_entry_id = cur.lastrowid
+            finally:
+                conn.close()
 
             # journaling counts as identity-aligned behaviour
             update_alignment_score(user_id, 1)
@@ -1042,14 +1068,19 @@ def journal():
 
     # load journal history
     conn = get_db_connection()
-    cur = conn.cursor()
-    cur.execute(
-        "SELECT id, entry_text, predicted_emotion, reframe, micro_task_text, micro_task_minutes, created_at "
-        "FROM journal_entries WHERE user_id = ? ORDER BY id DESC;",
-        (user_id,),
-    )
-    entries = cur.fetchall()
-    conn.close()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT id, entry_text, predicted_emotion, reframe, micro_task_text, micro_task_minutes, created_at "
+            "FROM journal_entries WHERE user_id = ? ORDER BY id DESC;",
+            (user_id,),
+        )
+        entries = cur.fetchall()
+    finally:
+        conn.close()
+
+    # Get streak for display
+    _, emotional_streak, _ = get_alignment_state(user_id)
 
     return render_template(
         "journal.html",
@@ -1059,6 +1090,7 @@ def journal():
         micro_task=micro_task,
         new_entry_id=new_entry_id,
         entries=entries,
+        emotional_streak=emotional_streak,
     )
 
 
@@ -1263,55 +1295,124 @@ def today():
     today_str = date.today().isoformat()
 
     conn = get_db_connection()
-    cur = conn.cursor()
+    try:
+        cur = conn.cursor()
 
-    # Today's todos: not done, and either no due date or due today or overdue
-    cur.execute(
-        "SELECT id, text, source, journal_entry_id, due_date, is_done, created_at "
-        "FROM todos WHERE user_id = ? AND (is_done = 0 AND (due_date IS NULL OR due_date <= ?)) "
-        "ORDER BY created_at DESC",
-        (user_id, today_str),
-    )
-    active_todos = cur.fetchall()
+        # Today's todos: not done, and either no due date or due today or overdue
+        cur.execute(
+            "SELECT id, text, source, journal_entry_id, due_date, is_done, created_at "
+            "FROM todos WHERE user_id = ? AND (is_done = 0 AND (due_date IS NULL OR due_date <= ?)) "
+            "ORDER BY created_at DESC",
+            (user_id, today_str),
+        )
+        active_todos = cur.fetchall()
 
-    # Recently completed todos (done today)
-    cur.execute(
-        "SELECT id, text, source, is_done, created_at "
-        "FROM todos WHERE user_id = ? AND is_done = 1 AND date(created_at) >= ? "
-        "ORDER BY created_at DESC LIMIT 10",
-        (user_id, today_str),
-    )
-    done_todos = cur.fetchall()
+        # Recently completed todos (done today)
+        cur.execute(
+            "SELECT id, text, source, is_done, created_at "
+            "FROM todos WHERE user_id = ? AND is_done = 1 AND date(created_at) >= ? "
+            "ORDER BY created_at DESC LIMIT 10",
+            (user_id, today_str),
+        )
+        done_todos = cur.fetchall()
 
-    # All active habits
-    cur.execute(
-        "SELECT id, name, is_sample FROM habits WHERE user_id = ? ORDER BY is_sample ASC, id ASC",
-        (user_id,),
-    )
-    habits_rows = cur.fetchall()
+        # All active habits
+        cur.execute(
+            "SELECT id, name, is_sample FROM habits WHERE user_id = ? ORDER BY is_sample ASC, id ASC",
+            (user_id,),
+        )
+        habits_rows = cur.fetchall()
 
-    # Which habits are completed today
-    cur.execute(
-        "SELECT habit_id FROM habit_completions hc "
-        "JOIN habits h ON hc.habit_id = h.id "
-        "WHERE h.user_id = ? AND date(hc.completed_at) = ?",
-        (user_id, today_str),
-    )
-    completed_habit_ids = {row['habit_id'] for row in cur.fetchall()}
+        # Which habits are completed today
+        cur.execute(
+            "SELECT habit_id FROM habit_completions hc "
+            "JOIN habits h ON hc.habit_id = h.id "
+            "WHERE h.user_id = ? AND date(hc.completed_at) = ?",
+            (user_id, today_str),
+        )
+        completed_habit_ids = {row['habit_id'] for row in cur.fetchall()}
 
-    # Quick weekly overview: tasks due in next 7 days
-    week_end = (date.today() + timedelta(days=7)).isoformat()
-    cur.execute(
-        "SELECT COUNT(*) as count FROM todos "
-        "WHERE user_id = ? AND is_done = 0 AND due_date IS NOT NULL AND due_date BETWEEN ? AND ?",
-        (user_id, today_str, week_end),
-    )
-    upcoming_count = cur.fetchone()['count']
+        # Quick weekly overview: tasks due in next 7 days
+        week_end = (date.today() + timedelta(days=7)).isoformat()
+        cur.execute(
+            "SELECT COUNT(*) as count FROM todos "
+            "WHERE user_id = ? AND is_done = 0 AND due_date IS NOT NULL AND due_date BETWEEN ? AND ?",
+            (user_id, today_str, week_end),
+        )
+        upcoming_count = cur.fetchone()['count']
 
-    # Alignment data for greeting
-    alignment_score, emotional_streak, _ = get_alignment_state(user_id)
+        # Alignment data for greeting
+        alignment_score, emotional_streak, _ = get_alignment_state(user_id)
 
-    conn.close()
+        # Daily identity belief reminder (cycles through beliefs)
+        cur.execute(
+            "SELECT belief_text FROM identity_beliefs WHERE user_id = ? ORDER BY RANDOM() LIMIT 1",
+            (user_id,),
+        )
+        belief_row = cur.fetchone()
+        today_belief = belief_row["belief_text"] if belief_row else None
+
+        # Weekly summary data
+        week_start = (date.today() - timedelta(days=6)).isoformat()
+
+        # Count active reflection days this week
+        cur.execute(
+            "SELECT COUNT(DISTINCT date(created_at)) as count "
+            "FROM journal_entries WHERE user_id = ? AND date(created_at) BETWEEN ? AND ?",
+            (user_id, week_start, today_str),
+        )
+        active_days_this_week = cur.fetchone()['count']
+
+        # Count habits completed this week
+        cur.execute(
+            "SELECT COUNT(*) as count FROM habit_completions hc "
+            "JOIN habits h ON hc.habit_id = h.id "
+            "WHERE h.user_id = ? AND date(hc.completed_at) BETWEEN ? AND ?",
+            (user_id, week_start, today_str),
+        )
+        habits_done_this_week = cur.fetchone()['count']
+
+        # Week days indicator (last 7 days) - OPTIMIZED: Single query instead of 7
+        cur.execute(
+            "SELECT DISTINCT date(created_at) as entry_date "
+            "FROM journal_entries WHERE user_id = ? AND date(created_at) BETWEEN ? AND ?",
+            (user_id, week_start, today_str),
+        )
+        active_dates = {row['entry_date'] for row in cur.fetchall()}
+
+        week_days = []
+        day_names = ['M', 'T', 'W', 'T', 'F', 'S', 'S']
+        day_full_names = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+
+        for i in range(7):
+            day_date = date.today() - timedelta(days=6-i)
+            day_str = day_date.isoformat()
+
+            week_days.append({
+                'initial': day_names[day_date.weekday()],
+                'name': day_full_names[day_date.weekday()],
+                'active': day_str in active_dates,
+                'is_today': day_str == today_str,
+            })
+
+        # Calculate stats for celebration
+        total_habits = len(habits_rows)
+        habits_completed_today = len(completed_habit_ids)
+        all_habits_completed = (total_habits > 0 and habits_completed_today == total_habits)
+
+        # Weekly encouragement message
+        weekly_message = None
+        if active_days_this_week >= 5:
+            weekly_message = "You're showing up consistently — that's powerful."
+        elif active_days_this_week >= 3:
+            weekly_message = "You're building momentum, one day at a time."
+        elif active_days_this_week >= 1:
+            weekly_message = "You showed up this week. That counts."
+
+        show_weekly_summary = (active_days_this_week > 0 or habits_done_this_week > 0)
+
+    finally:
+        conn.close()
 
     return render_template(
         "today.html",
@@ -1324,6 +1425,17 @@ def today():
         alignment_score=alignment_score,
         emotional_streak=emotional_streak,
         today_str=today_str,
+        # Weekly summary data
+        show_weekly_summary=show_weekly_summary,
+        week_days=week_days,
+        active_days_this_week=active_days_this_week,
+        habits_done_this_week=habits_done_this_week,
+        weekly_message=weekly_message,
+        # Habit completion stats
+        total_habits=total_habits,
+        habits_completed_today=habits_completed_today,
+        all_habits_completed=all_habits_completed,
+        today_belief=today_belief,
     )
 
 
@@ -1446,11 +1558,13 @@ def habits():
     # show all habits for this user
     conn = get_db_connection()
     cur = conn.cursor()
-    cur.execute(
-        "SELECT id, name, is_sample, created_at "
-        "FROM habits WHERE user_id = ? ORDER BY id ASC;",
-        (user_id,),
-    )
+    cur.execute("""
+        SELECT h.id, h.name, h.is_sample, h.created_at, g.goal_text
+        FROM habits h
+        LEFT JOIN goals g ON h.linked_goal_id = g.id
+        WHERE h.user_id = ?
+        ORDER BY h.id ASC
+    """, (user_id,))
     habits_rows = cur.fetchall()
     conn.close()
 
