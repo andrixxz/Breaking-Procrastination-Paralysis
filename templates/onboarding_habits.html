@@ -30,8 +30,8 @@
         <div class="section-header fade-in-up">
             <h1 class="section-title">Create tiny daily habits</h1>
             <p class="section-subtitle">
-                For each goal, create one small habit you can do daily.<br>
-                Keep it realistic — 2-5 minutes is perfect.
+                For each intention, create one small action you can do daily.<br>
+                Keep it realistic. 2-5 minutes is perfect.
             </p>
         </div>
 
@@ -50,10 +50,10 @@
             {% for goal in goals %}
             <div class="card" style="margin-bottom: 24px; padding: 24px;">
                 <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 12px;">
-                    <strong>Goal:</strong> {{ goal.goal_text }}
+                    <strong>Working towards:</strong> {{ goal.goal_text }}
                 </p>
                 <div class="form-group" style="margin-bottom: 0;">
-                    <label for="habit_{{ goal.id }}" class="form-label">Tiny Daily Habit</label>
+                    <label for="habit_{{ goal.id }}" class="form-label">Tiny Daily Action</label>
                     <textarea
                         id="habit_{{ goal.id }}"
                         name="habit_{{ goal.id }}"
@@ -66,7 +66,7 @@
             {% endfor %}
 
             <button type="submit" class="btn-calm" style="width: 100%; margin-top: 16px;">
-                Complete Onboarding →
+                Start your journey →
             </button>
 
             <a href="{{ url_for('onboarding_thoughts') }}" class="btn-text" style="display: block; text-align: center; margin-top: 12px;">

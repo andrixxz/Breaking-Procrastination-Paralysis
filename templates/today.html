@@ -36,8 +36,7 @@
             {% if emotional_streak > 0 %}
             <div style="margin-top: 12px;">
                 <span class="streak-display">
-                    <span class="streak-emoji">🔥</span>
-                    <span><span class="streak-number">{{ emotional_streak }}</span> day{{ 's' if emotional_streak != 1 }} of reflection</span>
+                    <span>🔥 <span class="streak-number">{{ emotional_streak }}</span> day{{ 's' if emotional_streak != 1 }} of showing up</span>
                 </span>
             </div>
             {% endif %}
@@ -48,6 +47,40 @@
         <div class="belief-reminder fade-in-up">
             <p class="belief-reminder-label">Today's identity reminder</p>
             <p class="belief-reminder-text">&ldquo;{{ today_belief }}&rdquo;</p>
+        </div>
+        {% endif %}
+
+        <!-- stage indicator: Awareness > Alignment > Action -->
+        {% if current_stage %}
+        <div class="stage-indicator fade-in-up">
+            <p class="stage-indicator-label">Where you are</p>
+            <div class="stage-track">
+                <div class="stage-node {{ 'stage-active' if current_stage == 'awareness' else 'stage-done' }}">
+                    <div class="stage-dot">~</div>
+                    <span class="stage-name">Awareness</span>
+                </div>
+                <div class="stage-connector {{ 'stage-connector-done' if current_stage in ['alignment', 'action'] else '' }}"></div>
+                <div class="stage-node {{ 'stage-active' if current_stage == 'alignment' else ('stage-done' if current_stage == 'action' else 'stage-upcoming') }}">
+                    <div class="stage-dot">*</div>
+                    <span class="stage-name">Alignment</span>
+                </div>
+                <div class="stage-connector {{ 'stage-connector-done' if current_stage == 'action' else '' }}"></div>
+                <div class="stage-node {{ 'stage-active' if current_stage == 'action' else 'stage-upcoming' }}">
+                    <div class="stage-dot">.</div>
+                    <span class="stage-name">Action</span>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- win acknowledgment (shown immediately after completing an action) -->
+        {% if todo_done %}
+        <div class="win-card fade-in-up">
+            <p class="win-card-text">One step forward. That counts.</p>
+        </div>
+        {% elif habit_done and not all_habits_completed %}
+        <div class="win-card fade-in-up">
+            <p class="win-card-text">That is evidence of who you are becoming.</p>
         </div>
         {% endif %}
 
@@ -87,10 +120,18 @@
             <div class="card metric-card">
                 <span class="metric-value">{{ alignment_score }}</span>
                 <p class="metric-label">Alignment Score</p>
+                <details class="psych-explainer">
+                    <summary>Why this works</summary>
+                    <p>This is not a performance score. It is a count of every time you showed up as the person you are becoming.</p>
+                </details>
             </div>
             <div class="card metric-card">
                 <span class="metric-value">{{ habits_completed_today }}/{{ total_habits }}</span>
                 <p class="metric-label">Today's Habits</p>
+                <details class="psych-explainer">
+                    <summary>Why this works</summary>
+                    <p>Tiny actions work because they are small enough that your brain does not perceive them as a threat. That is what breaks the freeze.</p>
+                </details>
             </div>
         </div>
 
@@ -98,7 +139,7 @@
         {% if all_habits_completed and total_habits > 0 %}
         <div class="completion-celebration">
             <span class="celebration-emoji">✨</span>
-            <p class="celebration-text">You completed all your tiny steps today!</p>
+            <p class="celebration-text">You did all your tiny steps today!</p>
             <p class="celebration-subtext">"I am becoming the version of myself I imagined."</p>
         </div>
         {% endif %}

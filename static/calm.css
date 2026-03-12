@@ -907,14 +907,6 @@ input::placeholder {
     }
 }
 
-@keyframes streakGlow {
-    0%, 100% {
-        box-shadow: 0 0 10px rgba(244, 165, 168, 0.3);
-    }
-    50% {
-        box-shadow: 0 0 20px rgba(244, 165, 168, 0.6);
-    }
-}
 
 .fade-in {
     animation: fadeIn var(--transition-slow) var(--ease-calm);
@@ -936,26 +928,20 @@ input::placeholder {
 .stagger-children > *:nth-child(7) { animation-delay: 0.35s; }
 .stagger-children > *:nth-child(8) { animation-delay: 0.4s; }
 
-/* --- Gamification Features --- */
+/* --- Streak Display --- */
 
-/* Streak Counter */
+/* Awareness streak counter — neuroplasticity tracking, not gamification */
 .streak-display {
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    background: linear-gradient(135deg, rgba(244, 165, 168, 0.12), rgba(168, 170, 219, 0.12));
+    background: linear-gradient(135deg, rgba(127, 163, 114, 0.1), rgba(212, 175, 106, 0.08));
     padding: 10px 18px;
     border-radius: var(--radius-pill);
     font-size: 0.95rem;
     color: var(--text-primary);
     font-weight: 400;
-    animation: streakGlow 3s ease-in-out infinite;
-    border: 1px solid rgba(244, 165, 168, 0.2);
-}
-
-.streak-emoji {
-    font-size: 1.2rem;
-    animation: gentleFloat 4s ease-in-out infinite;
+    border: 1px solid rgba(127, 163, 114, 0.2);
 }
 
 .streak-number {
@@ -1539,6 +1525,22 @@ input::placeholder {
     color: var(--text-muted);
     margin-top: 8px;
     font-size: 0.95em;
+}
+
+/* Psychoeducation callout on landing page — why this app is different */
+.landing-psych-note {
+    text-align: center;
+    max-width: 520px;
+    margin: 0 auto var(--space-lg);
+    padding: 16px 24px;
+    border-radius: var(--radius-md);
+    border: 1px solid rgba(127, 163, 114, 0.25);
+    background: rgba(127, 163, 114, 0.06);
+    font-size: 0.95rem;
+    color: var(--text-secondary);
+    line-height: 1.7;
+    font-style: italic;
+    font-family: 'Lora', Georgia, serif;
 }
 
 /* three pillars grid */
@@ -2163,6 +2165,61 @@ input::placeholder {
     margin: 0;
 }
 
+/* --- Win Acknowledgment Card --- */
+.win-card {
+    background: linear-gradient(135deg, var(--sage-green-light, #e8f0ec) 0%, var(--cream) 100%);
+    border-radius: var(--radius-lg);
+    padding: 18px 24px;
+    margin-bottom: var(--space-md);
+    border: 1px solid rgba(100, 148, 120, 0.2);
+    text-align: center;
+}
+
+.win-card-text {
+    font-family: 'Lora', Georgia, serif;
+    font-size: 1rem;
+    font-style: italic;
+    color: var(--text-primary);
+    margin: 0;
+    line-height: 1.6;
+}
+
+/* Win message inside reflection card (journal) */
+.reflection-win {
+    font-size: 0.95rem;
+    color: var(--text-secondary);
+    text-align: center;
+    margin-bottom: 16px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+/* --- Identity Resistance Normaliser (Onboarding beliefs page) --- */
+.identity-normaliser {
+    background: var(--cream);
+    border-radius: var(--radius-md);
+    border-left: 3px solid var(--sage-green);
+    padding: 16px 20px;
+    margin: 24px 0;
+    font-family: 'Lora', Georgia, serif;
+    font-style: italic;
+    font-size: 0.95rem;
+    color: var(--text-secondary);
+    line-height: 1.7;
+}
+
+/* First-use context shown before first journal entry */
+.first-journal-note {
+    background: var(--cream);
+    border-radius: var(--radius-md);
+    border-left: 3px solid var(--sage-green);
+    padding: 16px 20px;
+    margin-bottom: var(--space-md);
+    font-size: 0.95rem;
+    color: var(--text-secondary);
+    line-height: 1.7;
+}
+
 /* --- Habit Goal Context (Habits page) --- */
 .habit-name-text {
     display: block;
@@ -2212,4 +2269,193 @@ input::placeholder {
         flex-direction: column;
         align-items: center;
     }
+}
+
+/* grounding prompt */
+.grounding-prompt {
+    background: #f0f5ee;
+    border-left: 3px solid var(--sage-green);
+    border-radius: var(--radius-md);
+    padding: var(--space-md) var(--space-md);
+    margin-bottom: var(--space-md);
+}
+
+.grounding-prompt.grounding-collapsed {
+    padding: var(--space-xs) var(--space-md);
+}
+
+.grounding-breath {
+    font-size: 1.05rem;
+    color: var(--text-primary);
+    font-weight: 400;
+    margin-bottom: 6px;
+}
+
+.grounding-question {
+    font-size: 1rem;
+    color: var(--text-secondary);
+    margin-bottom: 6px;
+}
+
+.grounding-note {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-bottom: 0;
+}
+
+.grounding-toggle {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    cursor: pointer;
+    padding: 0;
+    margin-top: 10px;
+    text-decoration: underline;
+    display: block;
+    font-family: inherit;
+}
+
+.grounding-toggle:hover {
+    color: var(--text-secondary);
+}
+
+.grounding-collapsed .grounding-toggle {
+    margin-top: 0;
+}
+
+/* --- Stage Indicator (Awareness > Alignment > Action) --- */
+.stage-indicator {
+    background: var(--cream);
+    border-radius: var(--radius-md);
+    padding: 20px 24px;
+    margin-bottom: var(--space-md);
+    text-align: center;
+}
+
+.stage-indicator-label {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    margin-bottom: 16px;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+}
+
+.stage-track {
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+}
+
+.stage-node {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+    width: 72px;
+}
+
+.stage-dot {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    font-family: 'Lora', Georgia, serif;
+    transition: background 0.3s, color 0.3s;
+}
+
+.stage-name {
+    font-size: 0.75rem;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+}
+
+/* Active stage — user is here now */
+.stage-active .stage-dot {
+    background: var(--sage-green);
+    color: white;
+}
+
+.stage-active .stage-name {
+    color: var(--sage-green-dark);
+}
+
+/* Done stage — already passed through */
+.stage-done .stage-dot {
+    background: rgba(127, 163, 114, 0.2);
+    color: var(--sage-green-dark);
+}
+
+.stage-done .stage-name {
+    color: var(--text-muted);
+}
+
+/* Upcoming stage — not yet reached */
+.stage-upcoming .stage-dot {
+    background: rgba(0, 0, 0, 0.05);
+    color: var(--text-muted);
+}
+
+.stage-upcoming .stage-name {
+    color: var(--text-muted);
+    opacity: 0.6;
+}
+
+/* Connector line between nodes */
+.stage-connector {
+    width: 48px;
+    height: 1px;
+    background: rgba(0, 0, 0, 0.1);
+    flex-shrink: 0;
+    margin-top: 20px;
+}
+
+.stage-connector-done {
+    background: var(--sage-green);
+}
+
+/* --- Psychology Explainers --- */
+/* Expandable "Why this works" sections beside key features */
+.psych-explainer {
+    margin-top: 10px;
+}
+
+.psych-explainer summary {
+    font-size: 0.78rem;
+    color: var(--sage-green-dark, #5a7a5a);
+    cursor: pointer;
+    list-style: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    opacity: 0.75;
+    transition: opacity 0.2s;
+    user-select: none;
+}
+
+.psych-explainer summary::-webkit-details-marker {
+    display: none;
+}
+
+.psych-explainer summary::marker {
+    display: none;
+}
+
+.psych-explainer summary:hover {
+    opacity: 1;
+}
+
+.psych-explainer p {
+    margin-top: 8px;
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+    line-height: 1.65;
+    padding: 10px 14px;
+    background: rgba(127, 163, 114, 0.06);
+    border-left: 2px solid rgba(127, 163, 114, 0.35);
+    border-radius: 0 var(--radius-sm, 6px) var(--radius-sm, 6px) 0;
 }

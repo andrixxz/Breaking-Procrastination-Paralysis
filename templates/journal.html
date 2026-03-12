@@ -49,9 +49,30 @@
         {% if emotional_streak and emotional_streak > 0 %}
         <div style="text-align: center; margin-bottom: var(--space-md);" class="fade-in-up">
             <span class="streak-display">
-                <span class="streak-emoji">🔥</span>
-                <span><span class="streak-number">{{ emotional_streak }}</span> day{{ 's' if emotional_streak != 1 }} streak</span>
+                <span>🔥 <span class="streak-number">{{ emotional_streak }}</span> day{{ 's' if emotional_streak != 1 }} of showing up</span>
             </span>
+        </div>
+        {% endif %}
+
+        <!-- grounding prompt before writing -->
+        <div class="grounding-prompt fade-in-up" id="groundingPrompt">
+            <div class="grounding-inner" id="groundingInner">
+                <p class="grounding-breath">Take a slow breath. In... and out.</p>
+                <p class="grounding-question">What is one thing you can feel or hear right now?</p>
+                <p class="grounding-note">You do not need to answer that out loud. Just notice it for a moment before you write.</p>
+                <details class="psych-explainer">
+                    <summary>Why this works</summary>
+                    <p>A slow breath activates your parasympathetic nervous system, which calms the fight-or-flight response before you write.</p>
+                </details>
+            </div>
+            <button type="button" class="grounding-toggle" id="groundingToggle" onclick="toggleGrounding()">Hide this</button>
+        </div>
+
+        <!-- first-time user context (shown only before first entry) -->
+        {% if journal_count == 0 %}
+        <div class="first-journal-note fade-in-up">
+            <p>Writing how you feel activates the part of your brain that calms the avoidance response.</p>
+            <p style="margin-top: 8px;">You do not need to write a lot. Just start.</p>
         </div>
         {% endif %}
 
@@ -66,6 +87,10 @@
                     placeholder="I'm feeling..."
                 ></textarea>
                 <p class="form-hint">There is no wrong answer. Just notice what comes up.</p>
+                <details class="psych-explainer">
+                    <summary>Why this works</summary>
+                    <p>Writing externalises your thoughts, which activates your prefrontal cortex and calms the avoidance response.</p>
+                </details>
             </div>
             <button type="submit" class="btn-calm">Reflect</button>
             <a href="{{ url_for('today') }}" class="btn-text" style="margin-left: 16px;">Return to your space</a>
@@ -74,9 +99,16 @@
         <!-- emotional reflection (appears after submission) -->
         {% if predicted_emotion %}
         <div class="reflection-card">
+            <p class="reflection-win">You showed up for yourself. That matters.</p>
             <p class="reflection-emotion">
-                Detected emotion:
+                It sounds like you might be feeling
                 <span class="emotion-badge {{ predicted_emotion }}">{{ predicted_emotion }}</span>
+                right now.
+                {% if predicted_emotion == 'calm' %}
+                Notice that. It is worth holding on to.
+                {% else %}
+                Naming that is the first step.
+                {% endif %}
             </p>
 
             {% if reframe %}
@@ -189,7 +221,7 @@
         <div class="empty-state-enhanced">
             <div class="empty-state-icon">✍️</div>
             <p>Your first reflection will appear here when you are ready.</p>
-            <p style="margin-top: 8px; font-size: 0.85rem;">Take your time — there's no pressure to start.</p>
+            <p style="margin-top: 8px; font-size: 0.85rem;">Take your time. There is no pressure to start.</p>
         </div>
         {% endif %}
 
@@ -199,6 +231,43 @@
 
 <!-- cursor glow effect -->
 <div class="cursor-glow" id="cursorGlow"></div>
+<script>
+// grounding prompt toggle — remembers whether user collapsed it
+function getGroundingHidden() {
+    try { return localStorage.getItem('groundingHidden') === '1'; } catch(e) { return false; }
+}
+function setGroundingHidden(val) {
+    try { if (val) { localStorage.setItem('groundingHidden', '1'); } else { localStorage.removeItem('groundingHidden'); } } catch(e) {}
+}
+function toggleGrounding() {
+    var inner = document.getElementById('groundingInner');
+    var toggle = document.getElementById('groundingToggle');
+    var prompt = document.getElementById('groundingPrompt');
+    if (!inner || !toggle || !prompt) return;
+    if (inner.style.display === 'none') {
+        inner.style.display = '';
+        toggle.textContent = 'Hide this';
+        prompt.classList.remove('grounding-collapsed');
+        setGroundingHidden(false);
+    } else {
+        inner.style.display = 'none';
+        toggle.textContent = 'Show grounding prompt';
+        prompt.classList.add('grounding-collapsed');
+        setGroundingHidden(true);
+    }
+}
+// apply saved preference on page load
+(function() {
+    if (getGroundingHidden()) {
+        var inner = document.getElementById('groundingInner');
+        var toggle = document.getElementById('groundingToggle');
+        var prompt = document.getElementById('groundingPrompt');
+        if (inner) inner.style.display = 'none';
+        if (toggle) toggle.textContent = 'Show grounding prompt';
+        if (prompt) prompt.classList.add('grounding-collapsed');
+    }
+})();
+</script>
 <script>
 (function() {
     const glow = document.getElementById('cursorGlow');

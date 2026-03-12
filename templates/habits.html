@@ -40,10 +40,21 @@
         <div class="section-header fade-in-up">
             <h1 class="section-title">Tiny Steps</h1>
             <p class="section-subtitle">
-                Each habit below is a small action tied to one of your goals.
-                Completing them consistently is how identity shifts — one day at a time.
+                Each habit below is a small action tied to what you are working towards.
+                Showing up consistently is how identity shifts, one day at a time.
             </p>
+            <details class="psych-explainer">
+                <summary>Why this works</summary>
+                <p>Tiny actions work because they are small enough that your brain does not perceive them as a threat. That is what breaks the freeze.</p>
+            </details>
         </div>
+
+        <!-- win acknowledgment after submitting habits -->
+        {% if acknowledged %}
+        <div class="win-card fade-in-up">
+            <p class="win-card-text">That is evidence of who you are becoming.</p>
+        </div>
+        {% endif %}
 
         <!-- today's habits -->
         <form method="post" class="fade-in-up">
@@ -77,7 +88,7 @@
             <div class="empty-state-enhanced">
                 <div class="empty-state-icon">🌱</div>
                 <p>No tiny steps yet.</p>
-                <p style="margin-top: 8px; font-size: 0.85rem;">Add one below when you feel ready — it can be something very small.</p>
+                <p style="margin-top: 8px; font-size: 0.85rem;">Add one below when you feel ready. It can be something very small.</p>
             </div>
             {% endif %}
         </form>

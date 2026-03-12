@@ -32,12 +32,43 @@
             <p class="greeting-sub">This is who you are becoming.</p>
         </div>
 
+        <!-- daily identity belief reminder -->
+        {% if today_belief %}
+        <div class="belief-reminder fade-in-up">
+            <p class="belief-reminder-label">Today's identity reminder</p>
+            <p class="belief-reminder-text">&ldquo;{{ today_belief }}&rdquo;</p>
+        </div>
+        {% endif %}
+
+        <!-- stage indicator: Awareness > Alignment > Action -->
+        {% if current_stage %}
+        <div class="stage-indicator fade-in-up">
+            <p class="stage-indicator-label">Where you are</p>
+            <div class="stage-track">
+                <div class="stage-node {{ 'stage-active' if current_stage == 'awareness' else 'stage-done' }}">
+                    <div class="stage-dot">~</div>
+                    <span class="stage-name">Awareness</span>
+                </div>
+                <div class="stage-connector {{ 'stage-connector-done' if current_stage in ['alignment', 'action'] else '' }}"></div>
+                <div class="stage-node {{ 'stage-active' if current_stage == 'alignment' else ('stage-done' if current_stage == 'action' else 'stage-upcoming') }}">
+                    <div class="stage-dot">*</div>
+                    <span class="stage-name">Alignment</span>
+                </div>
+                <div class="stage-connector {{ 'stage-connector-done' if current_stage == 'action' else '' }}"></div>
+                <div class="stage-node {{ 'stage-active' if current_stage == 'action' else 'stage-upcoming' }}">
+                    <div class="stage-dot">.</div>
+                    <span class="stage-name">Action</span>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
         <!-- goals section -->
         {% if goals %}
         <div class="card identity-section fade-in-up">
             <div class="identity-section-header">
                 <h2>What you are working towards</h2>
-                <p class="section-subtitle">The goals you set when you started this journey.</p>
+                <p class="section-subtitle">What you set out to work on when you started this journey.</p>
             </div>
             <ul class="goal-list">
                 {% for goal in goals %}
@@ -55,7 +86,7 @@
         <div class="card identity-section fade-in-up">
             <div class="identity-section-header">
                 <h2>Who you are becoming</h2>
-                <p class="section-subtitle">Your identity beliefs — the person you committed to being when you started.</p>
+                <p class="section-subtitle">Your identity beliefs. The person you committed to being when you started.</p>
             </div>
             <div class="belief-list">
                 {% for belief in beliefs %}
@@ -84,11 +115,19 @@
                 <span class="metric-value">{{ alignment_score }}</span>
                 <p class="metric-label">Alignment Score</p>
                 <small>Grows with every reflection and action</small>
+                <details class="psych-explainer">
+                    <summary>Why this works</summary>
+                    <p>This is not a performance score. It is a count of every time you showed up as the person you are becoming.</p>
+                </details>
             </div>
             <div class="card metric-card">
                 <span class="metric-value">{{ emotional_streak }}</span>
-                <p class="metric-label">Day Streak</p>
-                <small>Consecutive days of checking in</small>
+                <p class="metric-label">Days of awareness</p>
+                <small>Each day you show up, the new story gets stronger</small>
+                <details class="psych-explainer">
+                    <summary>Why this works</summary>
+                    <p>Each consecutive day strengthens the neural pathway for your new identity. That is neuroplasticity in action.</p>
+                </details>
             </div>
             <div class="card metric-card">
                 <span class="metric-value">{{ journal_count }}</span>

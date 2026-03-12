@@ -30,9 +30,13 @@
         <div class="section-header fade-in-up">
             <h1 class="section-title">Rewrite as identity beliefs</h1>
             <p class="section-subtitle">
-                Turn each goal into an identity statement using "I am" language.<br>
-                Example: "Complete my project" → "I am someone who follows through on commitments."
+                Turn each intention into an identity statement using "I am" language.<br>
+                Example: "Finish my project" → "I am someone who follows through on commitments."
             </p>
+            <details class="psych-explainer">
+                <summary>Why this works</summary>
+                <p>When you rewrite an intention as an identity statement, you begin shifting what your subconscious looks for as evidence. Your brain starts noticing proof that the new belief is true.</p>
+            </details>
         </div>
 
         {% with messages = get_flashed_messages() %}
@@ -50,7 +54,7 @@
             {% for goal in goals %}
             <div class="card" style="margin-bottom: 24px; padding: 24px;">
                 <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 12px;">
-                    <strong>Goal:</strong> {{ goal.goal_text }}
+                    <strong>Working towards:</strong> {{ goal.goal_text }}
                 </p>
                 <div class="form-group" style="margin-bottom: 0;">
                     <label for="belief_{{ goal.id }}" class="form-label">Identity Belief</label>
@@ -64,6 +68,12 @@
                 </div>
             </div>
             {% endfor %}
+
+            <p class="identity-normaliser">
+                If this does not feel true yet, that is completely normal.
+                Your brain is used to the old story.
+                Each time you show up, the new one gets a little stronger.
+            </p>
 
             <button type="submit" class="btn-calm" style="width: 100%; margin-top: 16px;">
                 Next: Positive Thoughts →

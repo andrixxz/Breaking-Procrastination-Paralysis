@@ -510,19 +510,19 @@ def generate_reframe(journal_text: str, emotion_label: str) -> str:
     if emotion_label == "anxious":
         templates = [
             # 0: worry loop
-            f'The question "{echo}" is a trap — it demands certainty about something unknowable, which keeps you spinning without moving. Anxiety mistakes repetition for preparation. What you need isn\'t an answer to the question; you need to stop asking it. Pick one action that exists outside the loop — send a message, open a file, write one sentence — and watch the urgency lose its grip.',
+            f'The question "{echo}" is a trap. It demands certainty about something unknowable, which keeps you spinning without moving. Anxiety mistakes repetition for preparation. What you need is not an answer to the question. Stop asking it. Pick one action that exists outside the loop: send a message, open a file, write one sentence, and watch the urgency lose its grip.',
 
             # 1: avoidance cycle (open/close)
-            f'"{echo}" is threshold fear — the moment before starting feels unbearable, so you close the distance and retreat. But the fear isn\'t about the work; it\'s about crossing from safe to uncertain. The work itself is neutral. Open the file and leave it visible for 5 minutes without touching it. Let proximity replace avoidance as the new normal.',
+            f'"{echo}" is threshold fear. The moment before starting feels unbearable, so you close the distance and retreat. But the fear isn\'t about the work; it\'s about crossing from safe to uncertain. The work itself is neutral. Open the file and leave it visible for 5 minutes without touching it. Let proximity replace avoidance as the new normal.',
 
             # 2: catastrophizing
             f'The terror that "{echo}" is your mind confusing *feeling* in danger with *being* in danger. Fear amplifies the stakes to justify its own intensity, but the intensity isn\'t evidence. The task won\'t collapse you. Write one rough sentence with the explicit goal of it being bad. Show yourself the gap between dread and reality.',
 
             # 3: social fear
-            f'You\'re trapped between your inner experience and what you imagine others see — and that gap feels like proof something is wrong. But you\'re comparing your fear to their façade. They can\'t see your panic, and you can\'t see their doubt. Do one external action (open your notes, type one line) to anchor yourself in what\'s real, not what you think they think.',
+            f'You\'re trapped between your inner experience and what you imagine others see, and that gap feels like proof something is wrong. But you\'re comparing your fear to their façade. They can\'t see your panic, and you can\'t see their doubt. Do one external action (open your notes, type one line) to anchor yourself in what\'s real, not what you think they think.',
 
             # 4: general anxious
-            f'Worry is rehearsal disguised as protection — it creates the illusion of control over outcomes you can\'t influence yet. But spinning doesn\'t prevent disaster; it just exhausts you before anything happens. The way out isn\'t calm; it\'s movement. Pick the smallest concrete step available right now and take it. Let action replace rumination as the thing you do when uncertain.',
+            f'Worry is rehearsal disguised as protection, it creates the illusion of control over outcomes you can\'t influence yet. But spinning doesn\'t prevent disaster; it just exhausts you before anything happens. The way out isn\'t calm; it\'s movement. Pick the smallest concrete step available right now and take it. Let action replace rumination as the thing you do when uncertain.',
         ]
         return templates[template_idx]
 
@@ -530,16 +530,16 @@ def generate_reframe(journal_text: str, emotion_label: str) -> str:
     elif emotion_label == "overwhelmed":
         templates = [
             # 0: paralysis from choice
-            f'"{echo}" is decision paralysis — you\'re frozen because choosing one task feels like abandoning the others. But the paralysis itself is what\'s failing them all. There is no optimal sequence; there\'s only the cost of waiting for one to appear. Choose by deadline, by ease, or at random. Forward motion makes the next choice clearer. Pick one now.',
+            f'"{echo}" is decision paralysis. You\'re frozen because choosing one task feels like abandoning the others. But the paralysis itself is what\'s failing them all. There is no optimal sequence; there\'s only the cost of waiting for one to appear. Choose by deadline, by ease, or at random. Forward motion makes the next choice clearer. Pick one now.',
 
             # 1: volume overload
-            f'The sheer amount — "{echo}" — is creating the illusion that you need to hold it all in your mind at once. You don\'t. Overwhelm is a capacity error: trying to process everything simultaneously instead of sequentially. Release everything but one. Do that one thing for 10 minutes as if nothing else exists. Let the rest wait in the dark.',
+            f'"{echo}" is creating the illusion that you need to hold it all in your mind at once. You don\'t. Overwhelm is a capacity error: trying to process everything simultaneously instead of sequentially. Release everything but one. Do that one thing for 10 minutes as if nothing else exists. Let the rest wait in the dark.',
 
             # 2: holding all at once
             f'You\'re experiencing "{echo}" because you\'ve collapsed separate tasks into one crushing mass. Overwhelm happens when the boundaries between things dissolve. The antidote is artificial narrowing: write down three tasks, close the list, and do only the first one for 15 minutes. Shrink your world until it\'s survivable, then act inside it.',
 
             # 3: general overwhelmed
-            f'Everything feels urgent because urgency is the emotion of overload, not a fact about your tasks. When everything screams for attention, none of them are actually louder — you just can\'t tell the difference. The way forward is arbitrary choice. Pick the task that would quiet the loudest inner voice, or the one you could finish fastest. Do that one badly. Let completion replace perfection.',
+            f'Everything feels urgent because urgency is the emotion of overload, not a fact about your tasks. When everything screams for attention, none of them are actually louder, you just can\'t tell the difference. The way forward is arbitrary choice. Pick the task that would quiet the loudest inner voice, or the one you could finish fastest. Do that one badly. Let completion replace perfection.',
         ]
         return templates[template_idx]
 
@@ -547,16 +547,16 @@ def generate_reframe(journal_text: str, emotion_label: str) -> str:
     elif emotion_label == "stressed":
         templates = [
             # 0: time urgency
-            f'"{echo}" is your body interpreting time as a closing fist — the scarcity creates tunnel vision that makes solutions invisible. But deadline pressure doesn\'t require perfection; it requires output. You don\'t need to feel capable; you need to move. Set a 25-minute boundary and produce something rough. Speed, not quality. You can refine it later when the fist opens.',
+            f'"{echo}" is your body interpreting time as a closing fist. The scarcity creates tunnel vision that makes solutions invisible. But deadline pressure doesn\'t require perfection; it requires output. You don\'t need to feel capable. Just move. Set a 25-minute boundary and produce something rough. Speed, not quality. You can refine it later when the fist opens.',
 
             # 1: pressure reducing thinking
-            f'The stress you describe — "{echo}" — is narrowing your thinking into a defensive crouch, which makes everything harder to see. Pressure doesn\'t sharpen focus; it collapses it. But you don\'t need expanded thinking right now; you need reduced scope. Choose the most obvious next action and do only that for 20 minutes. Let momentum replace clarity as the engine.',
+            f'"{echo}" is narrowing your thinking into a defensive crouch, which makes everything harder to see. Pressure doesn\'t sharpen focus; it collapses it. But you don\'t need expanded thinking right now. Try reducing scope. Choose the most obvious next action and do only that for 20 minutes. Let momentum replace clarity as the engine.',
 
             # 2: stress blocking cognition
-            f'Stress is convincing you that confusion means incapacity — that because you can\'t think clearly, you can\'t act at all. That\'s backward. Clarity is the result of action, not the prerequisite. Your hands don\'t need your mind\'s permission. Open the file and type for 10 minutes with zero expectation of coherence. Let motion generate the clarity stress is withholding.',
+            f'Stress is convincing you that confusion means incapacity, as if because you can\'t think clearly, you can\'t act at all. That\'s backward. Clarity is the result of action, not the prerequisite. Your hands don\'t need your mind\'s permission. Open the file and type for 10 minutes with zero expectation of coherence. Let motion generate the clarity stress is withholding.',
 
             # 3: general stressed
-            f'Urgency is demanding immediate perfection, which is impossible and paralyzing. But stress distorts time — what feels like "everything now" is actually "something next, then something after." You don\'t need the whole task; you need the next 15 minutes. Do the most obvious fragment badly. Survival output is still output. Polish is a luxury for after the deadline passes.',
+            f'Urgency is demanding immediate perfection, which is impossible and paralyzing. But stress distorts time. What feels like "everything now" is actually "something next, then something after." You don\'t need the whole task. Just take the next 15 minutes. Do the most obvious fragment badly. Survival output is still output. Polish is a luxury for after the deadline passes.',
         ]
         return templates[template_idx]
 
@@ -564,19 +564,19 @@ def generate_reframe(journal_text: str, emotion_label: str) -> str:
     elif emotion_label == "avoidant":
         templates = [
             # 0: start-stop cycle
-            f'The pattern "{echo}" is a conditioning loop — every retreat teaches the threat response to fire faster next time. Avoidance feels like self-protection but functions as self-training: the task becomes more dangerous with each escape. The loop breaks through exposure without completion. Open the file and sit with it for 5 minutes. Don\'t work. Just stop running. Teach yourself that proximity isn\'t danger.',
+            f'The pattern "{echo}" is a conditioning loop. Every retreat teaches the threat response to fire faster next time. Avoidance feels like self-protection but functions as self-training: the task becomes more dangerous with each escape. The loop breaks through exposure without completion. Open the file and sit with it for 5 minutes. Don\'t work. Just stop running. Teach yourself that proximity isn\'t danger.',
 
             # 1: explicit avoidance
-            f'"{echo}" is the ache of knowing and not doing — and that gap is filled with shame disguised as relief. But avoidance doesn\'t reduce the discomfort; it compounds it with each delay. The task isn\'t getting easier by waiting; it\'s accumulating dread. Do the smallest possible fragment now — one sentence, one line, one click — without the burden of finishing. Just interrupt the pattern of retreat.',
+            f'"{echo}" is the ache of knowing and not doing, and that gap is filled with shame disguised as relief. But avoidance doesn\'t reduce the discomfort; it compounds it with each delay. The task isn\'t getting easier by waiting; it\'s accumulating dread. Do the smallest possible fragment now: one sentence, one line, one click, without the burden of finishing. Just interrupt the pattern of retreat.',
 
             # 2: postponing
             f'The bargain "{echo}" is your mind trading present discomfort for the fantasy of future readiness. But later you will feel exactly what you feel now, plus the weight of continued delay. Motivation is the reward for starting, not the prerequisite. Set a 2-minute timer and do a miniature version of the task. Not well. Not completely. Just immediately. Two minutes to prove later is a lie.',
 
             # 3: distraction
-            f'"{echo}" is the relief mechanism in real time — the discomfort of starting sends you toward anything softer, and the pattern strengthens each time you obey it. But distraction is debt: the task waits, and the next approach will be harder. Reverse the incentive. Do one small action on the task *first* — open one file, write one phrase — and earn the distraction after. Make avoidance cost something.',
+            f'"{echo}" is the relief mechanism in real time. The discomfort of starting sends you toward anything softer, and the pattern strengthens each time you obey it. But distraction is debt: the task waits, and the next approach will be harder. Reverse the incentive. Do one small action on the task first: open one file, write one phrase, then earn the distraction after. Make avoidance cost something.',
 
             # 4: general avoidant
-            f'You know what to do, but knowing isn\'t the obstacle — it\'s the absence of a feeling you\'re waiting for that will never arrive. Readiness, motivation, clarity: none of them precede action. They follow it. You don\'t need permission from your emotions to begin. Start in whatever state you\'re in — uncertain, resistant, afraid. Write one bad sentence. Let action create the feeling, not the reverse.',
+            f'You know what to do, but knowing isn\'t the obstacle. It\'s the absence of a feeling you\'re waiting for that will never arrive. Readiness, motivation, clarity: none of them precede action. They follow it. You don\'t need permission from your emotions to begin. Start in whatever state you\'re in, uncertain, resistant, afraid. Write one bad sentence. Let action create the feeling, not the reverse.',
         ]
         return templates[template_idx]
 
@@ -584,16 +584,16 @@ def generate_reframe(journal_text: str, emotion_label: str) -> str:
     elif emotion_label == "discouraged":
         templates = [
             # 0: hopelessness
-            f'When you think "{echo}", you\'re collapsing effort and outcome into the same thing — but they\'re not. Effort is yours; outcome is circumstance. Hopelessness mistakes uncertainty for inevitability. You can\'t see the result yet, but that doesn\'t mean trying is empty. It means trying is the only honest response to not knowing. Do 5 minutes of work as an experiment, not a solution. Test whether effort still holds meaning when success isn\'t promised.',
+            f'When you think "{echo}", you\'re collapsing effort and outcome into the same thing, but they\'re not. Effort is yours; outcome is circumstance. Hopelessness mistakes uncertainty for inevitability. You can\'t see the result yet, but that doesn\'t mean trying is empty. It means trying is the only honest response to not knowing. Do 5 minutes of work as an experiment, not a solution. Test whether effort still holds meaning when success isn\'t promised.',
 
             # 1: absolutist thinking
-            f'"{echo}" is the language of all-or-nothing — and absolutes erase the middle where most of living happens. You\'re frozen in a binary that doesn\'t exist: always failing or never capable. But patterns aren\'t permanent, and one moment doesn\'t predict all future ones. The story you\'re telling collapses time. Do one thing differently today — even trivially small — to prove the absolute is breakable. Let the exception shatter the rule.',
+            f'"{echo}" is the language of all-or-nothing, and absolutes erase the middle where most of living happens. You\'re frozen in a binary that doesn\'t exist: always failing or never capable. But patterns aren\'t permanent, and one moment doesn\'t predict all future ones. The story you\'re telling collapses time. Do one thing differently today, even trivially small, to prove the absolute is breakable. Let the exception shatter the rule.',
 
             # 2: low self-belief
-            f'The belief "{echo}" is treating a current limitation as a fixed identity. But what you can\'t do yet isn\'t the same as what you are. The gap between where you are and where you want to be isn\'t evidence of inadequacy — it\'s the space where capability grows. You only see the gap because you can imagine better. Do one small imperfect thing today. Not to prove you\'re capable. To prove you can still try when you don\'t believe you are.',
+            f'The belief "{echo}" is treating a current limitation as a fixed identity. But what you can\'t do yet isn\'t the same as what you are. The gap between where you are and where you want to be isn\'t evidence of inadequacy. It\'s the space where capability grows. You only see the gap because you can imagine better. Do one small imperfect thing today. Not to prove you\'re capable. To prove you can still try when you don\'t believe you are.',
 
             # 3: general discouraged
-            f'You\'re reading the difficulty as a verdict — if it\'s hard, you must not be built for it. But struggle is information about the learning curve, not your ceiling. The absence of ease doesn\'t mean the presence of impossibility. Do the smallest version of the task available — one sentence, one step, one attempt — not to succeed, but to stay in contact with forward motion. Let trying be the point when winning feels out of reach.',
+            f'You\'re reading the difficulty as a verdict. If it\'s hard, that doesn\'t mean you are not built for it. Struggle is information about the learning curve, not your ceiling. The absence of ease doesn\'t mean the presence of impossibility. Do the smallest version of the task available: one sentence, one step, one attempt, not to succeed, but to stay in contact with forward motion. Let trying be the point when winning feels out of reach.',
         ]
         return templates[template_idx]
 
@@ -601,16 +601,16 @@ def generate_reframe(journal_text: str, emotion_label: str) -> str:
     elif emotion_label == "calm":
         templates = [
             # 0: clarity
-            f'The clarity you describe — "{echo}" — is rare and worth protecting, but not by freezing or forcing productivity. Calm isn\'t a resource to extract; it\'s a state to inhabit. Take one gentle action from this place, not because you need to justify the feeling, but because ease is what makes sustainable work possible. Let the calm inform the pace, not the urgency.',
+            f'"{echo}" is rare and worth protecting, but not by freezing or forcing output. Calm isn\'t a resource to extract; it\'s a state to inhabit. Take one gentle action from this place, not to justify the feeling, but because ease is what makes sustainable work possible. Let the calm inform the pace, not the urgency.',
 
             # 1: general calm
-            f'This steadiness is valuable precisely because it asks nothing of you. You don\'t need to perform with it or amplify it into hyperproductivity. Just notice what it feels like to not be fighting yourself. If something wants to be done, do it lightly. If nothing does, rest here. Let calm be its own destination, not a launching pad.',
+            f'This steadiness is valuable precisely because it asks nothing of you. You don\'t need to perform with it or push it into overdrive. Just notice what it feels like to not be fighting yourself. If something wants to be done, do it lightly. If nothing does, rest here. Let calm be its own destination, not a launching pad.',
         ]
         return templates[template_idx]
 
     # === NEUTRAL / OTHER ===
     else:
-        return f'You wrote this down, which means part of you is still reaching toward change even when the path isn\'t clear. Awareness is the beginning of movement. You don\'t need a map or a plan — just the next smallest step. Pick something near, something easy, or something unfinished. Do it for 10 minutes. Let action clarify what reflection can\'t.'
+        return f'You wrote this down, which means part of you is still reaching toward change even when the path isn\'t clear. Awareness is the beginning of movement. You don\'t need a map or a plan. Just the next smallest step. Pick something near, something easy, or something unfinished. Do it for 10 minutes. Let action clarify what reflection can\'t.'
 
 
 def extract_work_object(text: str) -> str:
@@ -741,19 +741,19 @@ def generate_micro_task(journal_text: str, emotion_label: str) -> dict:
 
     if emotion_label == "anxious":
         return {
-            'task_text': f"{actions['open']} and leave it visible for 2 minutes. Don't type — just sit with it open.",
+            'task_text': f"{actions['open']} and leave it visible for 2 minutes. Don't type. Just sit with it open.",
             'estimated_minutes': 2,
             'why_this': f"Anxiety spikes at the threshold of starting. Having your {work_obj} open without pressure reduces that spike over time.",
         }
     elif emotion_label == "overwhelmed":
         return {
-            'task_text': f"{actions['small']}. Just that one thing — ignore everything else for now.",
+            'task_text': f"{actions['small']}. Just that one thing. Ignore everything else for now.",
             'estimated_minutes': 1,
             'why_this': f"Overwhelm dissolves when you shrink scope to a single visible action on your {work_obj}.",
         }
     elif emotion_label == "stressed":
         return {
-            'task_text': f"{actions['write']} — messy and imperfect. Speed over quality for 2 minutes.",
+            'task_text': f"{actions['write']}, messy and imperfect. Speed over quality for 2 minutes.",
             'estimated_minutes': 2,
             'why_this': f"Under time pressure, rough output on your {work_obj} beats no output.",
         }
@@ -765,7 +765,7 @@ def generate_micro_task(journal_text: str, emotion_label: str) -> dict:
         }
     elif emotion_label == "discouraged":
         return {
-            'task_text': f"{actions['write']} — not to finish, just to prove movement is still possible.",
+            'task_text': f"{actions['write']}, not to finish, just to prove movement is still possible.",
             'estimated_minutes': 1,
             'why_this': f"Discouragement says effort is pointless. One sentence in your {work_obj} says otherwise.",
         }
@@ -783,9 +783,61 @@ def generate_micro_task(journal_text: str, emotion_label: str) -> dict:
         }
 
 
-def get_affirmation(predicted_emotion: str) -> str:
-    """Return identity-based affirmation for given emotion"""
-    affirmations = {
+def get_affirmation(predicted_emotion: str, user_id: int = None) -> str:
+    """Return a personalised affirmation using the user's own identity belief if available."""
+
+    # try to get the user's own identity belief from the database
+    belief = None
+    if user_id:
+        conn = get_db_connection()
+        try:
+            cur = conn.cursor()
+            cur.execute(
+                "SELECT belief_text FROM identity_beliefs WHERE user_id = ? ORDER BY RANDOM() LIMIT 1",
+                (user_id,),
+            )
+            row = cur.fetchone()
+            if row:
+                belief = row["belief_text"].strip()
+        finally:
+            conn.close()
+
+    # if we have a belief, build a personalised affirmation around it
+    if belief:
+        personalised = {
+            "overwhelmed": (
+                "Everything feels like a lot right now, and that is okay. "
+                "You said {belief}. Being here, writing this, is proof of that."
+            ),
+            "anxious": (
+                "It makes sense that you feel anxious. That does not mean you cannot begin. "
+                "You said {belief}. Showing up right now is what that person does."
+            ),
+            "stuck": (
+                "Feeling stuck is not the same as being stuck. "
+                "You said {belief}. You are here, and that is a step forward."
+            ),
+            "stressed": (
+                "The pressure is real, and so is your ability to handle it at your own pace. "
+                "You said {belief}. This moment is part of that."
+            ),
+            "tired": (
+                "Rest is not giving up. It is part of the process. "
+                "You said {belief}. Honouring your energy is something that person would do."
+            ),
+            "calm": (
+                "This calm is something to notice. This is what it feels like when things settle. "
+                "You said {belief}. Right now, you are living that."
+            ),
+        }
+        template = personalised.get(
+            predicted_emotion,
+            "You said {belief}. Every time you show up like this, that belief gets a little more real."
+        )
+        return template.format(belief=belief)
+
+    # fallback for users who have not set identity beliefs yet
+    generic = {
         "overwhelmed": "I can take this slowly and still make progress.",
         "anxious": "I can steady myself and begin gently.",
         "stuck": "I move forward in small steps even when it feels hard.",
@@ -793,7 +845,7 @@ def get_affirmation(predicted_emotion: str) -> str:
         "tired": "I am allowed to pause without losing progress.",
         "calm": "I am becoming the version of myself I imagined.",
     }
-    return affirmations.get(predicted_emotion, "I am doing my best and that is enough.")
+    return generic.get(predicted_emotion, "I am doing my best and that is enough.")
 
 
 def get_alignment_state(user_id):
@@ -879,16 +931,16 @@ def update_emotional_streak_for_today(user_id):
 
 @app.route("/")
 def landing():
-    # public landing page — redirect to today if already logged in
+    # public landing page — redirect to dashboard if already logged in
     if 'user_id' in session:
-        return redirect(url_for('today'))
+        return redirect(url_for('dashboard'))
     return render_template("landing.html")
 
 
 @app.route("/signup", methods=["GET", "POST"])
 def signup():
     if 'user_id' in session:
-        return redirect(url_for('today'))
+        return redirect(url_for('dashboard'))
 
     if request.method == "POST":
         username = request.form.get("username", "").strip()
@@ -900,11 +952,11 @@ def signup():
             return render_template("signup.html")
 
         if len(username) < 3:
-            flash("Username must be at least 3 characters.", "error")
+            flash("Username needs to be at least 3 characters.", "error")
             return render_template("signup.html")
 
         if len(password) < 6:
-            flash("Password must be at least 6 characters.", "error")
+            flash("Password needs to be at least 6 characters.", "error")
             return render_template("signup.html")
 
         if password != confirm_password:
@@ -935,7 +987,7 @@ def signup():
         session.permanent = True
         session['user_id'] = user_id
         session['username'] = username
-        return redirect(url_for('today'))
+        return redirect(url_for('dashboard'))
 
     return render_template("signup.html")
 
@@ -959,7 +1011,7 @@ def login():
             session.permanent = True
             session['user_id'] = user["id"]
             session['username'] = username
-            return redirect(url_for('today'))
+            return redirect(url_for('dashboard'))
 
         flash("Invalid username or password.", "error")
 
@@ -1006,12 +1058,46 @@ def dashboard():
     cur.execute("SELECT COUNT(*) as count FROM journal_entries WHERE user_id = ?", (user_id,))
     journal_count = cur.fetchone()["count"]
 
+    # Surface one random identity belief as today's reminder (RAS reprogramming)
+    cur.execute(
+        "SELECT belief_text FROM identity_beliefs WHERE user_id = ? ORDER BY RANDOM() LIMIT 1",
+        (user_id,),
+    )
+    belief_row = cur.fetchone()
+    today_belief = belief_row["belief_text"] if belief_row else None
+
+    # Stage indicator: Awareness > Alignment > Action
+    today_str_dash = date.today().isoformat()
+    cur.execute(
+        "SELECT COUNT(*) as count FROM habit_completions hc "
+        "JOIN habits h ON hc.habit_id = h.id "
+        "WHERE h.user_id = ? AND date(hc.completed_at) = ?",
+        (user_id, today_str_dash),
+    )
+    habits_done_today = cur.fetchone()['count']
+    cur.execute(
+        "SELECT COUNT(*) as count FROM todos WHERE user_id = ? AND is_done = 1 AND date(created_at) = ?",
+        (user_id, today_str_dash),
+    )
+    todos_done_today = cur.fetchone()['count']
+    action_taken_today = (habits_done_today > 0 or todos_done_today > 0)
+    has_beliefs = len(beliefs) > 0  # beliefs already fetched above
+
+    if action_taken_today and has_beliefs and alignment_score > 0 and journal_count > 0:
+        current_stage = 'action'
+    elif has_beliefs and alignment_score > 0 and journal_count > 0:
+        current_stage = 'alignment'
+    elif journal_count > 0:
+        current_stage = 'awareness'
+    else:
+        current_stage = None
+
     conn.close()
 
     today_affirmation = None
     if last_entry:
         _, emotion, _ = last_entry
-        today_affirmation = get_affirmation(emotion)
+        today_affirmation = get_affirmation(emotion, user_id)
 
     return render_template(
         "dashboard.html",
@@ -1022,6 +1108,8 @@ def dashboard():
         goals=goals,
         beliefs=beliefs,
         journal_count=journal_count,
+        today_belief=today_belief,
+        current_stage=current_stage,
     )
 
 # main journaling page
@@ -1043,7 +1131,7 @@ def journal():
         if entry_text:
             predicted_emotion = predict_emotion(entry_text)
             reframe = generate_reframe(entry_text, predicted_emotion)
-            affirmation = get_affirmation(predicted_emotion)
+            affirmation = get_affirmation(predicted_emotion, user_id)
             micro_task = generate_micro_task(entry_text, predicted_emotion)
 
             conn = get_db_connection()
@@ -1082,6 +1170,9 @@ def journal():
     # Get streak for display
     _, emotional_streak, _ = get_alignment_state(user_id)
 
+    # journal_count used to show first-use context on the page
+    journal_count = len(entries)
+
     return render_template(
         "journal.html",
         predicted_emotion=predicted_emotion,
@@ -1091,6 +1182,7 @@ def journal():
         new_entry_id=new_entry_id,
         entries=entries,
         emotional_streak=emotional_streak,
+        journal_count=journal_count,
     )
 
 
@@ -1208,6 +1300,19 @@ def toggle_todo(todo_id):
     user_id = session['user_id']
     conn = get_db_connection()
     cur = conn.cursor()
+
+    # read current state before toggling so we know the direction
+    cur.execute(
+        "SELECT is_done FROM todos WHERE id = ? AND user_id = ?",
+        (todo_id, user_id),
+    )
+    row = cur.fetchone()
+    if row is None:
+        conn.close()
+        return redirect(url_for("today"))
+
+    was_done = row["is_done"]
+
     cur.execute(
         "UPDATE todos SET is_done = CASE WHEN is_done = 0 THEN 1 ELSE 0 END "
         "WHERE id = ? AND user_id = ?",
@@ -1216,12 +1321,15 @@ def toggle_todo(todo_id):
     conn.commit()
     conn.close()
 
-    # completing a todo boosts alignment
-    update_alignment_score(user_id, 1)
+    # only boost alignment when marking done, not when un-checking
+    if not was_done:
+        update_alignment_score(user_id, 1)
 
     redirect_to = request.form.get("redirect", "today")
     if redirect_to == "week":
         return redirect(url_for("week"))
+    if not was_done:
+        return redirect(url_for("today", todo_done="1"))
     return redirect(url_for("today"))
 
 
@@ -1250,6 +1358,9 @@ def toggle_habit(habit_id):
     if existing:
         # un-complete
         cur.execute("DELETE FROM habit_completions WHERE id = ?", (existing['id'],))
+        conn.commit()
+        conn.close()
+        return redirect(url_for("today"))
     else:
         # mark complete
         cur.execute(
@@ -1257,10 +1368,9 @@ def toggle_habit(habit_id):
             (habit_id, datetime.now().isoformat(timespec="seconds")),
         )
         update_alignment_score(user_id, 1)
-
-    conn.commit()
-    conn.close()
-    return redirect(url_for("today"))
+        conn.commit()
+        conn.close()
+        return redirect(url_for("today", habit_done="1"))
 
 
 @app.route("/todo/add-manual", methods=["POST"])
@@ -1403,7 +1513,7 @@ def today():
         # Weekly encouragement message
         weekly_message = None
         if active_days_this_week >= 5:
-            weekly_message = "You're showing up consistently — that's powerful."
+            weekly_message = "You're showing up consistently. That's powerful."
         elif active_days_this_week >= 3:
             weekly_message = "You're building momentum, one day at a time."
         elif active_days_this_week >= 1:
@@ -1411,8 +1521,27 @@ def today():
 
         show_weekly_summary = (active_days_this_week > 0 or habits_done_this_week > 0)
 
+        # Stage indicator: Awareness > Alignment > Action
+        cur.execute("SELECT COUNT(*) as count FROM journal_entries WHERE user_id = ?", (user_id,))
+        journal_count = cur.fetchone()['count']
+        cur.execute("SELECT COUNT(*) as count FROM identity_beliefs WHERE user_id = ?", (user_id,))
+        has_beliefs = cur.fetchone()['count'] > 0
+        action_taken_today = (habits_completed_today > 0 or len(done_todos) > 0)
+
+        if action_taken_today and has_beliefs and alignment_score > 0 and journal_count > 0:
+            current_stage = 'action'
+        elif has_beliefs and alignment_score > 0 and journal_count > 0:
+            current_stage = 'alignment'
+        elif journal_count > 0:
+            current_stage = 'awareness'
+        else:
+            current_stage = None
+
     finally:
         conn.close()
+
+    todo_done = request.args.get("todo_done") == "1"
+    habit_done = request.args.get("habit_done") == "1"
 
     return render_template(
         "today.html",
@@ -1436,6 +1565,10 @@ def today():
         habits_completed_today=habits_completed_today,
         all_habits_completed=all_habits_completed,
         today_belief=today_belief,
+        # Win acknowledgment flags
+        todo_done=todo_done,
+        habit_done=habit_done,
+        current_stage=current_stage,
     )
 
 
@@ -1553,7 +1686,7 @@ def habits():
 
             conn.commit()
             conn.close()
-            return redirect(url_for("habits"))
+            return redirect(url_for("habits", acknowledged="1"))
 
     # show all habits for this user
     conn = get_db_connection()
@@ -1568,7 +1701,8 @@ def habits():
     habits_rows = cur.fetchall()
     conn.close()
 
-    return render_template("habits.html", habits=habits_rows)
+    acknowledged = request.args.get("acknowledged") == "1"
+    return render_template("habits.html", habits=habits_rows, acknowledged=acknowledged)
 
 @app.route("/analytics")
 @login_required
