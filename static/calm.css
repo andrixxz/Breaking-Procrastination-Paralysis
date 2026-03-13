@@ -36,6 +36,11 @@
     --emotion-stressed: #EF5350;
     --emotion-tired: #64B5F6;
     --emotion-calm: #81C784;
+    --emotion-frustrated: #FF7043;
+    --emotion-guilty: #A1887F;
+    --emotion-unmotivated: #90A4AE;
+    --emotion-hopeful: #FFD54F;
+    --emotion-proud: #4DB6AC;
 
     /* Text (higher contrast) */
     --text-primary: #1F1F1F;
@@ -660,6 +665,78 @@ input::placeholder {
 .emotion-badge.calm {
     background: linear-gradient(135deg, var(--emotion-calm) 0%, #66BB6A 100%);
 }
+.emotion-badge.frustrated {
+    background: linear-gradient(135deg, var(--emotion-frustrated) 0%, #E64A19 100%);
+}
+.emotion-badge.guilty {
+    background: linear-gradient(135deg, var(--emotion-guilty) 0%, #795548 100%);
+}
+.emotion-badge.unmotivated {
+    background: linear-gradient(135deg, var(--emotion-unmotivated) 0%, #607D8B 100%);
+}
+.emotion-badge.hopeful {
+    background: linear-gradient(135deg, var(--emotion-hopeful) 0%, #FFC107 100%);
+    color: #1F1F1F;
+}
+.emotion-badge.proud {
+    background: linear-gradient(135deg, var(--emotion-proud) 0%, #00897B 100%);
+}
+
+/* --- Behaviour Badge (Task 2.3 - behaviour state from Model 2) --- */
+.reflection-behaviour {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    text-align: center;
+    margin-top: 4px;
+    margin-bottom: var(--space-sm);
+}
+
+.behaviour-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: var(--radius-pill);
+    font-size: 0.72rem;
+    font-weight: 500;
+    letter-spacing: 0.3px;
+    text-transform: capitalize;
+    background: var(--sage-green);
+    color: white;
+    box-shadow: 0 1px 6px rgba(0, 0, 0, 0.08);
+}
+
+.behaviour-badge.avoidance {
+    background: linear-gradient(135deg, #EF9A9A 0%, #E57373 100%);
+    color: #1F1F1F;
+}
+.behaviour-badge.overwhelm {
+    background: linear-gradient(135deg, #CE93D8 0%, #BA68C8 100%);
+}
+.behaviour-badge.rumination {
+    background: linear-gradient(135deg, #FFCC80 0%, #FFB74D 100%);
+    color: #1F1F1F;
+}
+.behaviour-badge.action {
+    background: linear-gradient(135deg, #A5D6A7 0%, #66BB6A 100%);
+    color: #1F1F1F;
+}
+.behaviour-badge.completion {
+    background: linear-gradient(135deg, #80CBC4 0%, #4DB6AC 100%);
+}
+.behaviour-badge.recovery {
+    background: linear-gradient(135deg, #90CAF9 0%, #64B5F6 100%);
+    color: #1F1F1F;
+}
+
+/* --- Identity Echo (Task 2.3 - user's belief echoed in response) --- */
+.reflection-identity-echo {
+    font-family: 'Lora', Georgia, serif;
+    font-size: 0.95rem;
+    color: var(--sage-green);
+    text-align: center;
+    padding: var(--space-xs) var(--space-sm);
+    margin-top: var(--space-xs);
+    font-style: italic;
+}
 
 /* --- Habits --- */
 .habit-list {
@@ -811,6 +888,21 @@ input::placeholder {
 }
 .emotion-bar-fill.calm {
     background: linear-gradient(90deg, var(--emotion-calm) 0%, #66BB6A 100%);
+}
+.emotion-bar-fill.frustrated {
+    background: linear-gradient(90deg, var(--emotion-frustrated) 0%, #E64A19 100%);
+}
+.emotion-bar-fill.guilty {
+    background: linear-gradient(90deg, var(--emotion-guilty) 0%, #795548 100%);
+}
+.emotion-bar-fill.unmotivated {
+    background: linear-gradient(90deg, var(--emotion-unmotivated) 0%, #607D8B 100%);
+}
+.emotion-bar-fill.hopeful {
+    background: linear-gradient(90deg, var(--emotion-hopeful) 0%, #FFC107 100%);
+}
+.emotion-bar-fill.proud {
+    background: linear-gradient(90deg, var(--emotion-proud) 0%, #00897B 100%);
 }
 .emotion-bar-fill.default {
     background: linear-gradient(90deg, var(--sage-green) 0%, var(--sage-green-dark) 100%);
@@ -2458,4 +2550,121 @@ input::placeholder {
     background: rgba(127, 163, 114, 0.06);
     border-left: 2px solid rgba(127, 163, 114, 0.35);
     border-radius: 0 var(--radius-sm, 6px) var(--radius-sm, 6px) 0;
+}
+
+
+/* -- Paralysis Score (Task 2.4) -- */
+
+.paralysis-score-card {
+    background: var(--cream, #FAF8F5);
+    border-radius: var(--radius-md, 12px);
+    padding: 16px 20px;
+    margin: 16px 0;
+    border-left: 4px solid var(--text-muted, #999);
+}
+
+.paralysis-score-card.flow {
+    border-left-color: var(--sage-green, #7FA372);
+}
+
+.paralysis-score-card.forward {
+    border-left-color: #81C784;
+}
+
+.paralysis-score-card.neutral {
+    border-left-color: var(--text-muted, #999);
+}
+
+.paralysis-score-card.resistance {
+    border-left-color: #FFB74D;
+}
+
+.paralysis-score-card.paralysis {
+    border-left-color: #E57373;
+}
+
+.paralysis-score-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.paralysis-score-label {
+    font-size: 0.82rem;
+    color: var(--text-muted, #999);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.paralysis-score-value {
+    font-size: 1.2rem;
+    font-weight: 500;
+    color: var(--text-primary, #1F1F1F);
+}
+
+.paralysis-bar-track {
+    position: relative;
+    height: 8px;
+    background: rgba(0, 0, 0, 0.06);
+    border-radius: 4px;
+    overflow: visible;
+    margin-bottom: 6px;
+}
+
+.paralysis-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.4s ease;
+}
+
+.paralysis-bar-fill.flow {
+    background: var(--sage-green, #7FA372);
+}
+
+.paralysis-bar-fill.forward {
+    background: #81C784;
+}
+
+.paralysis-bar-fill.neutral {
+    background: var(--text-muted, #999);
+}
+
+.paralysis-bar-fill.resistance {
+    background: #FFB74D;
+}
+
+.paralysis-bar-fill.paralysis {
+    background: #E57373;
+}
+
+.paralysis-bar-midpoint {
+    position: absolute;
+    top: -2px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 2px;
+    height: 12px;
+    background: var(--text-muted, #999);
+    opacity: 0.4;
+    border-radius: 1px;
+}
+
+.paralysis-bar-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.72rem;
+    color: var(--text-muted, #999);
+}
+
+/* Small inline badge for past entries */
+.paralysis-badge {
+    display: inline-block;
+    font-size: 0.7rem;
+    padding: 2px 8px;
+    border-radius: 10px;
+    background: rgba(0, 0, 0, 0.06);
+    color: var(--text-secondary, #555);
+    font-weight: 400;
+    vertical-align: middle;
 }

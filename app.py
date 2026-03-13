@@ -20,13 +20,27 @@ BASE_DIR = os.path.dirname(__file__)
 MODEL_DIR = os.path.join(BASE_DIR, "models") # where ML model + vectorizer are stored
 DB_PATH = os.path.join(BASE_DIR, "journal.db") # SQLite database
 
-# model file paths
+# model file paths — emotion classifier (Model 1)
 VECTORIZER_PATH = os.path.join(MODEL_DIR, "tfidf_vectorizer.pkl")
 MODEL_PATH = os.path.join(MODEL_DIR, "emotion_model.pkl")
 
-# load ML model + vectorizer
-vectorizer = joblib.load(VECTORIZER_PATH) # converts journal text into feature vectors
-emotion_model = joblib.load(MODEL_PATH) # logistic regression classifier for emotions
+# model file paths — behaviour state classifier (Model 2)
+BEHAVIOUR_VECTORIZER_PATH = os.path.join(MODEL_DIR, "behaviour_vectorizer.pkl")
+BEHAVIOUR_MODEL_PATH = os.path.join(MODEL_DIR, "behaviour_model.pkl")
+
+# load ML models — emotion classifier (always required)
+vectorizer = joblib.load(VECTORIZER_PATH)
+emotion_model = joblib.load(MODEL_PATH)
+
+# load ML models — behaviour state classifier (graceful fallback if not yet trained)
+behaviour_vectorizer = None
+behaviour_model = None
+if os.path.exists(BEHAVIOUR_VECTORIZER_PATH) and os.path.exists(BEHAVIOUR_MODEL_PATH):
+    behaviour_vectorizer = joblib.load(BEHAVIOUR_VECTORIZER_PATH)
+    behaviour_model = joblib.load(BEHAVIOUR_MODEL_PATH)
+    print("Behaviour state classifier loaded successfully.")
+else:
+    print("Warning: Behaviour model files not found. Run train_model.py to generate them.")
 
 
 # database setup + connection
@@ -62,6 +76,8 @@ def init_db():
             user_id INTEGER NOT NULL,
             entry_text TEXT NOT NULL,
             predicted_emotion TEXT NOT NULL,
+            predicted_behaviour TEXT,
+            paralysis_score REAL,
             reframe TEXT,
             micro_task_text TEXT,
             micro_task_minutes INTEGER,
@@ -187,6 +203,10 @@ def migrate_db_for_onboarding():
         cur.execute("ALTER TABLE journal_entries ADD COLUMN micro_task_text TEXT")
     if 'micro_task_minutes' not in journal_columns:
         cur.execute("ALTER TABLE journal_entries ADD COLUMN micro_task_minutes INTEGER")
+    if 'predicted_behaviour' not in journal_columns:
+        cur.execute("ALTER TABLE journal_entries ADD COLUMN predicted_behaviour TEXT")
+    if 'paralysis_score' not in journal_columns:
+        cur.execute("ALTER TABLE journal_entries ADD COLUMN paralysis_score REAL")
 
     # 7. Create todos table
     cur.execute("""
@@ -331,10 +351,146 @@ def normalise_entry_text(text: str) -> str:
 
 
 def predict_emotion(text: str) -> str:
-    # convert journal entry then tf-idf features then predict using LR model
+    """Predict emotion from journal text using Model 1."""
     X = vectorizer.transform([text])
     pred = emotion_model.predict(X)[0]
     return pred
+
+
+def predict_behaviour(text: str) -> str:
+    """Predict behaviour state from journal text using Model 2. Returns None if model not loaded."""
+    if behaviour_model is None or behaviour_vectorizer is None:
+        return None
+    try:
+        X = behaviour_vectorizer.transform([text])
+        pred = behaviour_model.predict(X)[0]
+        return pred
+    except Exception:
+        return None
+
+
+# -- Paralysis Score Algorithm (Task 2.4) --
+# Combines behaviour state, emotion, keyword signals and daily frequency
+# into a single score that quantifies how frozen the user is.
+# Negative = productive/flowing, Positive = paralysed/stuck.
+
+# Behaviour state contribution to paralysis score
+BEHAVIOUR_WEIGHTS = {
+    "avoidance": 3,
+    "overwhelm": 2,
+    "rumination": 1,
+    "recovery": -1,
+    "action": -2,
+    "completion": -3,
+}
+
+# Emotion contribution to paralysis score
+EMOTION_WEIGHTS = {
+    "guilty": 2,
+    "anxious": 2,
+    "overwhelmed": 2,
+    "stressed": 1,
+    "unmotivated": 1,
+    "frustrated": 1,
+    "stuck": 1,
+    "tired": 0,
+    "calm": -1,
+    "hopeful": -2,
+    "proud": -2,
+}
+
+# Words that signal deeper paralysis when present in journal text
+PARALYSIS_KEYWORDS = ["can't", "never", "always", "hate", "impossible"]
+
+
+def calculate_paralysis_score(emotion, behaviour, entry_text, user_id):
+    """Calculate paralysis score from emotion, behaviour, keywords, and daily frequency."""
+
+    # Edge case: no text provided
+    if not entry_text or not entry_text.strip():
+        return None
+
+    # Edge case: emotion is required at minimum
+    if not emotion:
+        return None
+
+    raw_score = 0.0
+
+    # 1. Behaviour state weight (skip if model unavailable)
+    if behaviour and behaviour in BEHAVIOUR_WEIGHTS:
+        raw_score += BEHAVIOUR_WEIGHTS[behaviour]
+
+    # 2. Emotion weight
+    if emotion in EMOTION_WEIGHTS:
+        raw_score += EMOTION_WEIGHTS[emotion]
+    # Edge case: unknown emotion label - treat as neutral (0)
+
+    # 3. Keyword boost - presence of paralysis-signalling words
+    # +1 per keyword found, capped at +3
+    text_lower = entry_text.lower()
+    keyword_count = 0
+    for keyword in PARALYSIS_KEYWORDS:
+        if keyword in text_lower:
+            keyword_count += 1
+    keyword_boost = min(keyword_count, 3)
+    raw_score += keyword_boost
+
+    # 4. Frequency factor - 3rd+ negative entry today means stuck in a loop
+    # Negative states are emotions with weight >= 1 or behaviours of avoidance/overwhelm/rumination
+    negative_emotions = [e for e, w in EMOTION_WEIGHTS.items() if w >= 1]
+    try:
+        today_str = date.today().isoformat()
+        conn = get_db_connection()
+        try:
+            cur = conn.cursor()
+            cur.execute(
+                "SELECT predicted_emotion FROM journal_entries "
+                "WHERE user_id = ? AND created_at LIKE ?",
+                (user_id, today_str + "%"),
+            )
+            today_entries = cur.fetchall()
+        finally:
+            conn.close()
+
+        # Count how many of today's previous entries had negative emotions
+        negative_count = sum(
+            1 for row in today_entries
+            if row["predicted_emotion"] in negative_emotions
+        )
+        # If this new entry is also negative, add 1 to count for the check
+        if emotion in negative_emotions:
+            negative_count += 1
+        # 3rd or more negative entry today adds +1
+        if negative_count >= 3:
+            raw_score += 1
+    except Exception:
+        # Edge case: DB error during frequency check - skip this factor
+        pass
+
+    # 5. Normalise to -5 to +5 range
+    # Theoretical raw range: behaviour(-3 to +3) + emotion(-2 to +2) + keywords(0 to +3) + frequency(0 to +1) = -5 to +9
+    # Without behaviour model: emotion(-2 to +2) + keywords(0 to +3) + frequency(0 to +1) = -2 to +6
+    # Clamp to -5 to +5
+    score = max(-5.0, min(5.0, raw_score))
+
+    # Round to one decimal place for clean storage and display
+    return round(score, 1)
+
+
+def get_paralysis_label(score):
+    """Return a human-readable label and CSS class for the paralysis score."""
+    if score is None:
+        return None, None
+    if score <= -3:
+        return "In flow", "flow"
+    elif score <= -1:
+        return "Moving forward", "forward"
+    elif score <= 1:
+        return "Neutral", "neutral"
+    elif score <= 3:
+        return "Some resistance", "resistance"
+    else:
+        return "High paralysis", "paralysis"
 
 
 def extract_echo_phrase(text: str) -> str:
@@ -482,6 +638,60 @@ def select_template_index(text_lower: str, emotion: str) -> int:
         else:
             return 1  # general calm template
 
+    # Tired: 3 templates
+    elif emotion == "tired":
+        if "sleep" in text_lower or "slept" in text_lower or "insomnia" in text_lower:
+            return 0  # sleep deprivation template
+        elif "burnout" in text_lower or "burnt" in text_lower or "weeks" in text_lower:
+            return 1  # burnout template
+        else:
+            return 2  # general tired template
+
+    # Frustrated: 4 templates
+    elif emotion == "frustrated":
+        if "myself" in text_lower or "angry at me" in text_lower:
+            return 0  # self-directed anger template
+        elif "broken" in text_lower or "not working" in text_lower or "keeps" in text_lower:
+            return 1  # system frustration template
+        elif "again" in text_lower or "same mistake" in text_lower:
+            return 2  # repeated failure template
+        else:
+            return 3  # general frustrated template
+
+    # Guilty: 4 templates
+    elif emotion == "guilty":
+        if "let" in text_lower and ("down" in text_lower or "people" in text_lower):
+            return 0  # letting others down template
+        elif "wasted" in text_lower or "spent" in text_lower:
+            return 1  # wasting time template
+        elif "should have" in text_lower or "could have" in text_lower:
+            return 2  # should-have template
+        else:
+            return 3  # general guilty template
+
+    # Unmotivated: 3 templates
+    elif emotion == "unmotivated":
+        if "point" in text_lower or "why" in text_lower or "matter" in text_lower:
+            return 0  # existential apathy template
+        elif "used to" in text_lower or "anymore" in text_lower:
+            return 1  # lost interest template
+        else:
+            return 2  # general unmotivated template
+
+    # Hopeful: 2 templates
+    elif emotion == "hopeful":
+        if "progress" in text_lower or "managed" in text_lower or "started" in text_lower:
+            return 0  # evidence-based hope template
+        else:
+            return 1  # general hopeful template
+
+    # Proud: 2 templates
+    elif emotion == "proud":
+        if "finished" in text_lower or "completed" in text_lower or "submitted" in text_lower:
+            return 0  # completion pride template
+        else:
+            return 1  # general proud template
+
     # Neutral/other: 1 template
     else:
         return 0
@@ -500,9 +710,11 @@ def generate_reframe(journal_text: str, emotion_label: str) -> str:
     text_lower = journal_text.lower()
     echo = extract_echo_phrase(journal_text)
 
-    # Map 'stuck' to avoidant for compatibility
+    # Map internal labels for reframe template compatibility
     if emotion_label == "stuck":
         emotion_label = "avoidant"
+    elif emotion_label == "unmotivated":
+        emotion_label = "discouraged"
 
     template_idx = select_template_index(text_lower, emotion_label)
 
@@ -608,6 +820,76 @@ def generate_reframe(journal_text: str, emotion_label: str) -> str:
         ]
         return templates[template_idx]
 
+    # === TIRED TEMPLATES ===
+    elif emotion_label == "tired":
+        templates = [
+            # 0: sleep deprivation
+            f'"{echo}" is your body telling you a truth your expectations are ignoring. Sleep deprivation degrades cognition the same way alcohol does, but nobody would expect you to write an essay drunk. The honest move is to rest, or to do the absolute minimum: open the file for 2 minutes, then close it. Let rest be a strategy, not a failure.',
+
+            # 1: burnout
+            f'This exhaustion is not weakness. It is the cost of running at a pace your body could not sustain. You do not recover from burnout by pushing harder. You recover by doing less, deliberately and without guilt. If you can manage 5 minutes of the simplest possible task, do that. If not, rest. Tomorrow you will have more to work with than today.',
+
+            # 2: general tired
+            f'You are trying to think clearly with depleted resources, and your brain is rationing energy by making everything feel harder than it is. Fatigue distorts difficulty. The task is not as impossible as it feels right now. Do the smallest fragment you can: one sentence, one bullet point. Then stop. Tiny output from a tired mind still counts as forward motion.',
+        ]
+        return templates[template_idx]
+
+    # === FRUSTRATED TEMPLATES ===
+    elif emotion_label == "frustrated":
+        templates = [
+            # 0: self-directed anger
+            f'The anger behind "{echo}" is pointed inward, and that means you still care. Frustration with yourself is not evidence of inadequacy; it is evidence that your standards exceed your current output. But punishing yourself for the gap does not close it. Channel the anger: pick one concrete action and do it roughly, imperfectly, with all that energy behind it. Let frustration become fuel instead of fire.',
+
+            # 1: system frustration
+            f'"{echo}" is the friction of things not cooperating. When systems break or tools fail, the rational response is irritation. But frustration narrows attention to the obstacle and hides the workaround. Step back for 60 seconds. Ask: what is the simplest path around this? Not the ideal fix, just the next move that bypasses what is broken. Redirect the energy.',
+
+            # 2: repeated failure
+            f'"{echo}" is the sting of a pattern repeating. Each time it happens, the frustration compounds because it feels like proof that nothing changes. But repeating the attempt is not the same as repeating the failure. Something is different each time, even if you cannot see it yet. Try one small variation: a different time, a different starting point, a different first step. Break the loop by changing one input.',
+
+            # 3: general frustrated
+            f'Frustration is impatience wearing a disguise. You want to be further ahead than you are, and the gap between expectation and reality feels intolerable. But the gap is not evidence of failure. It is the space where learning happens. Do one imperfect thing in the next 5 minutes. Not to satisfy the frustration, but to move through it. Action metabolises anger faster than thinking does.',
+        ]
+        return templates[template_idx]
+
+    # === GUILTY TEMPLATES ===
+    elif emotion_label == "guilty":
+        templates = [
+            # 0: letting others down
+            f'The weight of "{echo}" is real, but guilt about letting someone down does not make you a bad person. It makes you someone who cares. The difference between guilt and action is movement: guilt keeps you frozen in the past, action moves you toward repair. You cannot undo yesterday. You can do one thing today that your future self will thank you for. Start there.',
+
+            # 1: wasting time
+            f'"{echo}" is guilt performing its favourite trick: making the lost time feel worse than it was by adding shame on top. But time you spent surviving, resting, or coping was not wasted. It was spent. The question now is not where the time went. It is what you can do with the next 10 minutes. One small action turns the narrative from loss to recovery.',
+
+            # 2: should-have
+            f'The thought "{echo}" is hindsight pretending to be wisdom. Of course you should have started earlier. You also should have been born knowing everything. Neither is possible. The version of you who delayed was doing their best with the resources they had. Guilt about the past does not earn you future productivity. Action does. Pick one thing, do it now, and let that be the turning point.',
+
+            # 3: general guilty
+            f'Guilt is a signal that your values and your actions are out of alignment, and that signal has value. But sitting in the guilt does not restore the alignment. Only action does. You do not need to fix everything at once. You need one step that moves you toward the person you want to be. Take that step now, however small, and let it quiet the guilt by one degree.',
+        ]
+        return templates[template_idx]
+
+    # === HOPEFUL TEMPLATES ===
+    elif emotion_label == "hopeful":
+        templates = [
+            # 0: evidence-based hope
+            f'"{echo}" is your brain recognising real evidence that things are shifting. This is not blind optimism. It is pattern recognition: you did something, and something changed. The risk now is expecting too much too fast. Protect this feeling by keeping your next action small. One gentle step from this place. Let the hope carry you forward without overloading the moment.',
+
+            # 1: general hopeful
+            f'This feeling is fragile and worth protecting. Hope does not need to justify itself with massive action. It just needs one small thing to land on. Do something gentle from this place: review your notes, write one sentence, plan one step. Let the hope build naturally, without pressure to prove it was right. Momentum from ease lasts longer than momentum from urgency.',
+        ]
+        return templates[template_idx]
+
+    # === PROUD TEMPLATES ===
+    elif emotion_label == "proud":
+        templates = [
+            # 0: completion pride
+            f'"{echo}" is a moment worth holding on to. You finished something, and that matters more than you think. The brain remembers completions as evidence of capability, and every completion makes the next start slightly easier. Take a moment to notice how this feels. Then, only if you want to, choose one small next thing. Let the pride carry you gently, not push you into overdrive.',
+
+            # 1: general proud
+            f'This pride is earned. You showed up, you did the thing, and that is evidence of who you are becoming. Do not rush past this feeling to start the next task. Sit with it. Let your brain register: I did this. I can do hard things. When you are ready, choose one small action from this place of strength. Not because you have to, but because you want to.',
+        ]
+        return templates[template_idx]
+
     # === NEUTRAL / OTHER ===
     else:
         return f'You wrote this down, which means part of you is still reaching toward change even when the path isn\'t clear. Awareness is the beginning of movement. You don\'t need a map or a plan. Just the next smallest step. Pick something near, something easy, or something unfinished. Do it for 10 minutes. Let action clarify what reflection can\'t.'
@@ -652,8 +934,11 @@ def generate_micro_task(journal_text: str, emotion_label: str) -> dict:
     """
     work_obj = extract_work_object(journal_text)
 
+    # map internal labels for micro-task compatibility
     if emotion_label == "stuck":
         emotion_label = "avoidant"
+    elif emotion_label == "unmotivated":
+        emotion_label = "discouraged"
 
     # Work-object-specific action fragments
     obj_actions = {
@@ -775,12 +1060,553 @@ def generate_micro_task(journal_text: str, emotion_label: str) -> dict:
             'estimated_minutes': 2,
             'why_this': f"Calm is the best state to gently re-engage with your {work_obj} without pressure.",
         }
+    elif emotion_label == "tired":
+        return {
+            'task_text': f"{actions['open']} and look at it for 1 minute. If energy allows, {actions['small'].lower()}. If not, close it and rest.",
+            'estimated_minutes': 1,
+            'why_this': f"When energy is low, even opening your {work_obj} counts. Pushing harder backfires when tired.",
+        }
+    elif emotion_label == "frustrated":
+        return {
+            'task_text': f"{actions['write']}, rough and imperfect. Channel the frustration into output for 2 minutes.",
+            'estimated_minutes': 2,
+            'why_this': f"Frustration carries energy. Two minutes of rough output on your {work_obj} converts anger into momentum.",
+        }
+    elif emotion_label == "guilty":
+        return {
+            'task_text': f"{actions['small']}. One small action now is worth more than guilt about yesterday.",
+            'estimated_minutes': 1,
+            'why_this': f"Guilt locks you in the past. One action on your {work_obj} moves you into the present.",
+        }
+    elif emotion_label == "hopeful":
+        return {
+            'task_text': f"{actions['review']} and write down one thing you want to do next. Keep it gentle.",
+            'estimated_minutes': 2,
+            'why_this': f"Hope is a good state to plan from. A gentle step on your {work_obj} builds on the feeling without forcing it.",
+        }
+    elif emotion_label == "proud":
+        return {
+            'task_text': f"Take a moment to notice what you accomplished. Then, if you want, {actions['review'].lower()} and pick one small next step.",
+            'estimated_minutes': 2,
+            'why_this': f"Pride is evidence your brain is rewiring. One gentle step on your {work_obj} from this place strengthens the pattern.",
+        }
     else:
         return {
             'task_text': f"{actions['open']} and spend 2 minutes looking at where you left off.",
             'estimated_minutes': 2,
             'why_this': f"Re-engaging with your {work_obj} for 2 minutes builds momentum without pressure.",
         }
+
+
+# Combined intervention matrix - Task 2.3
+# Maps (emotion, behaviour) to a targeted reframe + micro-task
+# selected from BOTH dimensions of the ML pipeline.
+# Template placeholders:
+#   {echo}     - phrase echoed from the user's journal text
+#   {work_obj} - detected work object (essay, report, task, etc.)
+
+INTERVENTION_MATRIX = {
+
+    # -- AVOIDANCE: user is distancing from or putting off work --
+
+    ("overwhelmed", "avoidance"): {
+        "reframe": 'You wrote "{echo}" and the sheer volume pushed you into retreat. Your brain is creating distance from something that feels too big. You do not need to face all of it right now, just one piece.',
+        "task_text": "Open your {work_obj} and look at just one section for 2 minutes. Ignore everything else.",
+        "task_minutes": 2,
+        "why_this": "Overwhelm-driven avoidance breaks when you narrow scope to one visible piece of your {work_obj}.",
+    },
+    ("anxious", "avoidance"): {
+        "reframe": 'The avoidance around "{echo}" is shielding you from uncertainty, but each retreat teaches your brain the work is dangerous. It is not. The danger is a feeling, not a fact.',
+        "task_text": "Open your {work_obj} and leave it visible for 2 minutes. Do not type, just let it be open.",
+        "task_minutes": 2,
+        "why_this": "Anxiety-driven avoidance weakens through safe, pressure-free proximity to your {work_obj}.",
+    },
+    ("stuck", "avoidance"): {
+        "reframe": 'You feel stuck around "{echo}" and the not-knowing has turned into not-starting. Being stuck is not the same as being unable. The path forward appears when you get close enough to see it.',
+        "task_text": "Open your {work_obj} and set a 2-minute timer. Sit with it open. When the timer ends, you can close it.",
+        "task_minutes": 2,
+        "why_this": "When stuckness becomes avoidance, proximity to your {work_obj} is the first step back.",
+    },
+    ("stressed", "avoidance"): {
+        "reframe": 'Time pressure around "{echo}" makes avoidance feel rational, as if waiting might somehow create more time. It will not. The task is not getting easier and the clock does not stop.',
+        "task_text": "Open your {work_obj} and write one rough sentence. Speed over quality for 2 minutes.",
+        "task_minutes": 2,
+        "why_this": "Stress-driven avoidance burns the time that pressure claims to protect. One rough action on your {work_obj} is enough.",
+    },
+    ("tired", "avoidance"): {
+        "reframe": 'Your energy is low and avoiding "{echo}" feels like self-care. Sometimes rest is the right call. But if this is weighing on you, even 1 minute of contact is better than carrying the weight of avoidance.',
+        "task_text": "Open your {work_obj} for 1 minute. If nothing comes, close it and rest without guilt.",
+        "task_minutes": 1,
+        "why_this": "When tired, brief contact with your {work_obj} breaks avoidance without draining energy.",
+    },
+    ("calm", "avoidance"): {
+        "reframe": 'You feel steady, but something about "{echo}" is still being avoided. This calm is the best possible state to approach what you have been putting off. The work will feel less threatening from here.',
+        "task_text": "Open your {work_obj} gently and spend 2 minutes with it. Let the calm carry you in.",
+        "task_minutes": 2,
+        "why_this": "Calm is the safest state to re-engage with your {work_obj} and break the avoidance pattern.",
+    },
+    ("frustrated", "avoidance"): {
+        "reframe": 'The frustration behind "{echo}" is pushing you away from the work, but that anger carries energy. Right now it is fuelling retreat. It could fuel movement instead.',
+        "task_text": "Open your {work_obj} and channel 2 minutes of that energy into rough, imperfect output.",
+        "task_minutes": 2,
+        "why_this": "Frustration contains energy that, redirected toward your {work_obj}, converts anger into momentum.",
+    },
+    ("guilty", "avoidance"): {
+        "reframe": 'Guilt about "{echo}" is adding weight to the avoidance. Each hour of delay layers more shame on top, making the next start harder. One small action now breaks the loop that guilt and avoidance feed together.',
+        "task_text": "Open your {work_obj} and do one small thing. One sentence, one bullet point, anything.",
+        "task_minutes": 1,
+        "why_this": "Guilt and avoidance feed each other. One action on your {work_obj} interrupts both.",
+    },
+    ("unmotivated", "avoidance"): {
+        "reframe": 'Nothing about "{echo}" feels worth the effort, and the avoidance feels like honesty. But motivation is not a prerequisite for action. It is a byproduct of it. Contact with the work creates the drive that waiting never will.',
+        "task_text": "Open your {work_obj} and spend 2 minutes looking at where you left off. Let contact replace enthusiasm.",
+        "task_minutes": 2,
+        "why_this": "When unmotivated and avoiding, proximity to your {work_obj} can generate the motivation waiting cannot.",
+    },
+    ("hopeful", "avoidance"): {
+        "reframe": 'The hope you feel is real, but "{echo}" suggests something is still being held at a distance. This is a good moment to close the gap between feeling ready and actually starting.',
+        "task_text": "Open your {work_obj} and take one gentle step from this place of hope. Let it carry you in.",
+        "task_minutes": 2,
+        "why_this": "Hope paired with avoidance means the readiness is there but the first step is missing on your {work_obj}.",
+    },
+    ("proud", "avoidance"): {
+        "reframe": 'You have something to be proud of, but "{echo}" tells me something else is being avoided. Use the confidence from what you accomplished. You already know you can do hard things.',
+        "task_text": "Open your {work_obj} and carry this momentum into one small action. 2 minutes.",
+        "task_minutes": 2,
+        "why_this": "Pride builds confidence that can overcome avoidance of your {work_obj}.",
+    },
+
+    # -- OVERWHELM: user is drowning in volume or scope --
+
+    ("overwhelmed", "overwhelm"): {
+        "reframe": 'Both your feeling and your behaviour around "{echo}" are telling the same story: there is too much, and you are trying to hold it all at once. You cannot process everything simultaneously. Release everything but one task.',
+        "task_text": "Write down three things related to your {work_obj}. Pick the smallest. Do just that for 2 minutes.",
+        "task_minutes": 2,
+        "why_this": "When overwhelm is both feeling and behaviour, narrowing to one piece of your {work_obj} is the only way through.",
+    },
+    ("anxious", "overwhelm"): {
+        "reframe": 'Anxiety is making every part of "{echo}" feel equally urgent, and the volume is genuine. But urgency is a feeling, not a fact about your tasks. Not everything needs to happen now.',
+        "task_text": "Pick the one part of your {work_obj} that would quiet the loudest worry. Give it 2 minutes.",
+        "task_minutes": 2,
+        "why_this": "Anxiety amplifies overwhelm. Picking one worry-reducing action on your {work_obj} calms both.",
+    },
+    ("stuck", "overwhelm"): {
+        "reframe": 'You cannot find a way through "{echo}" because you are looking at everything at once. The path is hidden behind the volume. Narrow your view to one single task and the rest will wait.',
+        "task_text": "Pick one section of your {work_obj} and spend 2 minutes on just that. Ignore the rest.",
+        "task_minutes": 2,
+        "why_this": "Stuckness from overwhelm resolves when you limit your view to one piece of your {work_obj}.",
+    },
+    ("stressed", "overwhelm"): {
+        "reframe": 'Deadline pressure around "{echo}" is making everything feel simultaneous. Time scarcity and volume are a difficult combination, but they both respond to the same fix: pick one thing.',
+        "task_text": "Pick the most urgent part of your {work_obj} and give it 2 minutes of rough, imperfect attention.",
+        "task_minutes": 2,
+        "why_this": "Stress plus overwhelm requires forced prioritisation of one part of your {work_obj}.",
+    },
+    ("tired", "overwhelm"): {
+        "reframe": 'Your energy is too low to process this volume around "{echo}". Fatigue makes everything look bigger than it is. You do not have the capacity for all of it, and that is fine. You have the capacity for one thing.',
+        "task_text": "Pick the easiest part of your {work_obj} and spend 1 minute on it. Protect your energy.",
+        "task_minutes": 1,
+        "why_this": "Tired and overwhelmed means your {work_obj} needs the easiest possible entry point.",
+    },
+    ("calm", "overwhelm"): {
+        "reframe": 'You feel calm but the volume around "{echo}" is real. This steadiness is your advantage right now. Most people face overwhelm from anxiety or stress. You get to face it from stability.',
+        "task_text": "Use this calm to pick one part of your {work_obj} and give it 2 minutes of gentle attention.",
+        "task_minutes": 2,
+        "why_this": "Calm during overwhelm is rare. Use it to make one clear choice about your {work_obj}.",
+    },
+    ("frustrated", "overwhelm"): {
+        "reframe": 'The volume around "{echo}" is real and the frustration makes it feel worse. But that energy can be useful. Instead of fighting the volume, pick one task that would feel satisfying to finish.',
+        "task_text": "Pick one part of your {work_obj} that would feel good to finish and give it 2 rough minutes.",
+        "task_minutes": 2,
+        "why_this": "Frustration contains energy that, aimed at one piece of your {work_obj}, cuts through overwhelm.",
+    },
+    ("guilty", "overwhelm"): {
+        "reframe": 'Guilt about "{echo}" is adding emotional weight on top of the practical volume. That combination is crushing. Release the guilt for now. It does not help you process the work.',
+        "task_text": "Write down one thing you can do on your {work_obj} in the next 2 minutes and do only that.",
+        "task_minutes": 2,
+        "why_this": "Guilt amplifies overwhelm. One concrete action on your {work_obj} quiets both.",
+    },
+    ("unmotivated", "overwhelm"): {
+        "reframe": 'Nothing feels worth starting when there is this much going on with "{echo}". The volume drains motivation before you even begin. Pick the task that requires the least energy.',
+        "task_text": "Pick the easiest part of your {work_obj} and spend 2 minutes on it. Start with what is simple.",
+        "task_minutes": 2,
+        "why_this": "Unmotivated plus overwhelmed means your {work_obj} needs the lowest-effort entry point.",
+    },
+    ("hopeful", "overwhelm"): {
+        "reframe": 'The hope you feel is a good sign even with all this volume around "{echo}". Let the hope guide your choice. Pick the one task that feels most possible right now.',
+        "task_text": "Pick the part of your {work_obj} that excites you most and give it 2 gentle minutes.",
+        "task_minutes": 2,
+        "why_this": "Hope during overwhelm is a compass. Use it to pick the right piece of your {work_obj}.",
+    },
+    ("proud", "overwhelm"): {
+        "reframe": 'You accomplished something worth being proud of, and the remaining volume of "{echo}" is still there. Let the pride sit. You have already proven you can do hard things. One more small thing.',
+        "task_text": "Pick one remaining part of your {work_obj} and give it 2 minutes. You already proved you can.",
+        "task_minutes": 2,
+        "why_this": "Pride after accomplishment provides evidence you can handle one more piece of your {work_obj}.",
+    },
+
+    # -- RUMINATION: user is stuck in thought loops, overthinking --
+
+    ("overwhelmed", "rumination"): {
+        "reframe": 'Your mind is spinning about "{echo}" without finding a way forward. Thinking harder about too many things will not produce clarity. The loop needs to be broken externally.',
+        "task_text": "Write down what is on your mind about your {work_obj} on paper. Then set a 2-minute timer and do one physical action.",
+        "task_minutes": 2,
+        "why_this": "Overwhelm fuels rumination. Externalising thoughts about your {work_obj} breaks the loop.",
+    },
+    ("anxious", "rumination"): {
+        "reframe": 'The worry loop around "{echo}" is your brain rehearsing danger that may not arrive. This loop consumes energy without producing safety. The way out is not more thinking, it is one action.',
+        "task_text": "Write down the worst case about your {work_obj}, then the most likely case. Then do one small action.",
+        "task_minutes": 2,
+        "why_this": "Anxious rumination responds to reality-testing followed by one concrete step on your {work_obj}.",
+    },
+    ("stuck", "rumination"): {
+        "reframe": 'You are thinking in circles about "{echo}" and waiting for clarity to appear. It will not come from more thinking. Clarity is a byproduct of action, not a prerequisite for it.',
+        "task_text": "Set a 2-minute timer and write one sentence about your {work_obj}. Any sentence. Break the loop.",
+        "task_minutes": 2,
+        "why_this": "Stuck rumination breaks when you force one output on your {work_obj}, however imperfect.",
+    },
+    ("stressed", "rumination"): {
+        "reframe": 'Time pressure has your mind racing about "{echo}" without landing anywhere. The racing is burning time, not saving it. Thinking faster does not equal thinking better.',
+        "task_text": "Set a 2-minute timer. Do the most obvious thing on your {work_obj}. Rough output is still output.",
+        "task_minutes": 2,
+        "why_this": "Stress-driven rumination wastes the time it claims to protect. One rough action on your {work_obj} is better.",
+    },
+    ("tired", "rumination"): {
+        "reframe": 'Your mind is circling "{echo}" but you are too tired to think productively. The loop is consuming energy you do not have. Let it go for now.',
+        "task_text": "Write down the one thought about your {work_obj} that keeps repeating. Then close everything and rest.",
+        "task_minutes": 1,
+        "why_this": "Tired rumination drains the little energy left. Capture the thought about your {work_obj} and rest.",
+    },
+    ("calm", "rumination"): {
+        "reframe": 'You feel calm but your mind is still circling "{echo}". Use this clarity to put the thoughts on paper. Once externalised, the loop loses its grip on your attention.',
+        "task_text": "Write down what you are thinking about your {work_obj}. Then take one small action on it.",
+        "task_minutes": 2,
+        "why_this": "Calm rumination is the easiest loop to break. Externalise thoughts about your {work_obj} and act.",
+    },
+    ("frustrated", "rumination"): {
+        "reframe": 'Frustration about "{echo}" is feeding the thought loop, and the loop is feeding the frustration. They are amplifying each other. The cycle breaks when you do something different.',
+        "task_text": "Write down what is frustrating about your {work_obj}. Then try one thing differently from last time.",
+        "task_minutes": 2,
+        "why_this": "Frustrated rumination feeds itself. One variation in approach to your {work_obj} interrupts the loop.",
+    },
+    ("guilty", "rumination"): {
+        "reframe": 'The guilt about "{echo}" is replaying on a loop, and each replay makes it heavier. Guilt in your head compounds. Guilt addressed with action dissolves.',
+        "task_text": "Write down what you feel guilty about regarding your {work_obj}. Then do one thing that moves forward.",
+        "task_minutes": 2,
+        "why_this": "Guilty rumination dissolves with one forward action on your {work_obj}.",
+    },
+    ("unmotivated", "rumination"): {
+        "reframe": 'You are stuck thinking about "{echo}" without any drive to act on it. The loop will not generate motivation. Motion generates motivation, not the reverse.',
+        "task_text": "Write down one thing you could do on your {work_obj} in 2 minutes. Then do it. Motion first.",
+        "task_minutes": 2,
+        "why_this": "Unmotivated rumination waits for motivation that only comes from acting on your {work_obj}.",
+    },
+    ("hopeful", "rumination"): {
+        "reframe": 'Hope is present but your mind is still processing "{echo}". The thinking is circling around possibility without landing. Let the hope move from thought into one real action.',
+        "task_text": "Write down what you are hoping for with your {work_obj}. Then take one small step toward it.",
+        "task_minutes": 2,
+        "why_this": "Hopeful rumination resolves when the hope becomes one concrete action on your {work_obj}.",
+    },
+    ("proud", "rumination"): {
+        "reframe": 'You have something to be proud of, but your mind is still circling "{echo}". Write down what you accomplished. Let yourself see it on paper instead of spinning it in your head.',
+        "task_text": "Write down what you accomplished with your {work_obj}. Then, if you want, plan one next step.",
+        "task_minutes": 2,
+        "why_this": "Proud rumination resolves when the accomplishment is externalised and your {work_obj} progress is visible.",
+    },
+
+    # -- ACTION: user is actively working (support continuation) --
+
+    ("overwhelmed", "action"): {
+        "reframe": 'You are moving forward on "{echo}" despite feeling overwhelmed. That takes real strength. The overwhelm has not stopped you. Keep your focus narrow and your pace steady.',
+        "task_text": "Keep going with your {work_obj} for 2 more minutes. If the overwhelm rises, shrink your focus smaller.",
+        "task_minutes": 2,
+        "why_this": "Action during overwhelm is rare and valuable. Protecting momentum on your {work_obj} matters more than speed.",
+    },
+    ("anxious", "action"): {
+        "reframe": 'You are working through the anxiety around "{echo}". That is harder than most people understand. The anxiety is loud, but you are moving anyway. That matters.',
+        "task_text": "Keep your current pace on your {work_obj}. If anxiety spikes, pause for 30 seconds, breathe, then continue.",
+        "task_minutes": 2,
+        "why_this": "Anxious action is courageous. Steady pace on your {work_obj} teaches your brain the work is safe.",
+    },
+    ("stuck", "action"): {
+        "reframe": 'You were stuck on "{echo}" but you found a way through. Do not question why it is working. Just stay with this pace. If stuckness returns, make the task even smaller.',
+        "task_text": "Keep going with your {work_obj} at this pace for 2 more minutes. You are already moving.",
+        "task_minutes": 2,
+        "why_this": "Movement after stuckness is fragile. Protecting momentum on your {work_obj} is the priority.",
+    },
+    ("stressed", "action"): {
+        "reframe": 'You are producing output under pressure around "{echo}". Rough and fast is fine right now. Refinement comes later. What matters is that something is being created.',
+        "task_text": "Keep working on your {work_obj} for 2 more minutes. Speed over quality. You can refine later.",
+        "task_minutes": 2,
+        "why_this": "Stressed action produces output. Rough progress on your {work_obj} beats no progress.",
+    },
+    ("tired", "action"): {
+        "reframe": 'You are working on "{echo}" despite low energy. That is admirable, but be careful not to push past your limit. Sustainable effort lasts longer than desperate sprints.',
+        "task_text": "Keep going with your {work_obj} for 2 more minutes, then take a real break. Protect your energy.",
+        "task_minutes": 2,
+        "why_this": "Tired action needs a boundary. Two more minutes on your {work_obj}, then genuine rest.",
+    },
+    ("calm", "action"): {
+        "reframe": 'You are in a good space with "{echo}". This is what sustainable productivity feels like. Protect this state by keeping your pace gentle and your expectations reasonable.',
+        "task_text": "Keep working on your {work_obj} at this easy pace. No need to push harder. Steady wins.",
+        "task_minutes": 2,
+        "why_this": "Calm action is the most sustainable state for your {work_obj}. Protect it by not overcommitting.",
+    },
+    ("frustrated", "action"): {
+        "reframe": 'The frustration around "{echo}" is fuelling your output. That energy is useful right now. Channel it, but watch for the moment when anger stops being productive and starts making mistakes.',
+        "task_text": "Keep going on your {work_obj} for 2 more minutes. When the frustration shifts to exhaustion, pause.",
+        "task_minutes": 2,
+        "why_this": "Frustrated action has energy but limited runway. Use it wisely on your {work_obj}.",
+    },
+    ("guilty", "action"): {
+        "reframe": 'You are working through the guilt of "{echo}". Every minute you put in now is closing the gap between where you are and where you want to be. Let the action quiet the guilt.',
+        "task_text": "Keep going on your {work_obj} for 2 more minutes. Each minute of work dissolves a layer of guilt.",
+        "task_minutes": 2,
+        "why_this": "Guilty action is restorative. Each minute on your {work_obj} reduces the gap guilt points at.",
+    },
+    ("unmotivated", "action"): {
+        "reframe": 'You are working on "{echo}" without motivation. That is the hardest kind of effort and it counts the most. Motivation follows action. You are building it right now.',
+        "task_text": "Keep going on your {work_obj} for 2 more minutes. You are proving motivation is not required.",
+        "task_minutes": 2,
+        "why_this": "Unmotivated action is discipline. Each minute on your {work_obj} generates the drive waiting could not.",
+    },
+    ("hopeful", "action"): {
+        "reframe": 'Hope and action together on "{echo}" are building real momentum. This is what change feels like from the inside. Let the hope sustain your pace without pushing into overdrive.',
+        "task_text": "Keep working on your {work_obj} gently. Let the hope carry the pace. No need to rush.",
+        "task_minutes": 2,
+        "why_this": "Hopeful action builds on itself. Gentle momentum on your {work_obj} lasts longer than urgency.",
+    },
+    ("proud", "action"): {
+        "reframe": 'You are working from a place of pride and momentum on "{echo}". This is the ideal state. Protect your energy. When pride shifts to pressure, take a break.',
+        "task_text": "Keep working on your {work_obj} from this place of strength. When you feel the shift to pressure, stop and rest.",
+        "task_minutes": 2,
+        "why_this": "Proud action is powerful but can tip into overcommitment. Protect your energy on your {work_obj}.",
+    },
+
+    # -- COMPLETION: user just finished something (celebrate, rest, do not push) --
+
+    ("overwhelmed", "completion"): {
+        "reframe": 'You finished something related to "{echo}" even while feeling overwhelmed. That matters more than you realise. Rest here for a moment. Do not immediately look at the next thing on the pile.',
+        "task_text": "Take a moment to notice what you finished on your {work_obj}. Close it. Rest before looking at what is next.",
+        "task_minutes": 1,
+        "why_this": "Completion during overwhelm needs acknowledgment. Rushing to the next part of your {work_obj} erases the win.",
+    },
+    ("anxious", "completion"): {
+        "reframe": 'You completed something on "{echo}" despite the anxiety telling you it would go wrong. It did not. You did it. Sit with that for a moment before the anxiety tries to pull you into the next worry.',
+        "task_text": "Notice what you finished on your {work_obj}. The next task can wait. Let your brain register this win.",
+        "task_minutes": 1,
+        "why_this": "Anxious completion needs space. Pausing after your {work_obj} win teaches your brain it was safe.",
+    },
+    ("stuck", "completion"): {
+        "reframe": 'You were stuck on "{echo}" and you still managed to finish something. That is real evidence that being stuck is not permanent. Take a moment to notice how this feels.',
+        "task_text": "Notice what you finished on your {work_obj}. Being stuck did not stop you. Remember that.",
+        "task_minutes": 1,
+        "why_this": "Completion after stuckness is evidence that stuckness on your {work_obj} is temporary.",
+    },
+    ("stressed", "completion"): {
+        "reframe": 'You finished something on "{echo}" under pressure. The stress made it feel harder than it was. Take a breath. You do not need to carry the urgency into the next task.',
+        "task_text": "Take a breath. You finished part of your {work_obj}. Let the urgency ease before starting the next part.",
+        "task_minutes": 1,
+        "why_this": "Stressed completion needs decompression. A pause after your {work_obj} prevents burnout.",
+    },
+    ("tired", "completion"): {
+        "reframe": 'You finished something on "{echo}" despite low energy. Rest now. You have earned it. Do not start the next thing until your energy recovers.',
+        "task_text": "You finished part of your {work_obj}. Close it. Rest. The next task will be easier when your energy returns.",
+        "task_minutes": 1,
+        "why_this": "Tired completion demands rest. Recovery now makes your next session on your {work_obj} more effective.",
+    },
+    ("calm", "completion"): {
+        "reframe": 'You completed something on "{echo}" from a place of calm. This is what sustainable progress feels like. No urgency, no panic, just steady output. Notice how different this feels.',
+        "task_text": "Notice what you finished on your {work_obj}. Rest or continue gently, whichever feels right. No pressure.",
+        "task_minutes": 1,
+        "why_this": "Calm completion is the ideal state. Savouring it trains your brain that your {work_obj} can feel good.",
+    },
+    ("frustrated", "completion"): {
+        "reframe": 'You pushed through the frustration of "{echo}" and finished something. Let the frustration go now. It served its purpose. You did the thing you were angry about.',
+        "task_text": "Notice what you finished on your {work_obj}. The frustration can release now. It did its job.",
+        "task_minutes": 1,
+        "why_this": "Frustrated completion deserves acknowledgment. Let the anger go now that your {work_obj} is done.",
+    },
+    ("guilty", "completion"): {
+        "reframe": 'You finished something that guilt about "{echo}" was weighing on. Let the guilt release. One action was all it took. The gap between your values and your actions just got smaller.',
+        "task_text": "Notice what you finished on your {work_obj}. The guilt can ease now. You took action.",
+        "task_minutes": 1,
+        "why_this": "Guilty completion restores alignment. Finishing part of your {work_obj} proves action is possible.",
+    },
+    ("unmotivated", "completion"): {
+        "reframe": 'You finished something about "{echo}" without motivation driving you. That is discipline in its purest form. It is more reliable than motivation will ever be. Rest now.',
+        "task_text": "You finished part of your {work_obj} without motivation. That is worth noticing. Rest.",
+        "task_minutes": 1,
+        "why_this": "Unmotivated completion is evidence of discipline. Your {work_obj} does not require motivation.",
+    },
+    ("hopeful", "completion"): {
+        "reframe": 'You completed something on "{echo}" and the hope was justified. This is evidence that things are changing. Let your brain register this before rushing to the next thing.',
+        "task_text": "Notice what you finished on your {work_obj}. The hope was right. Sit with this feeling.",
+        "task_minutes": 1,
+        "why_this": "Hopeful completion reinforces the hope. Let your brain register this {work_obj} win.",
+    },
+    ("proud", "completion"): {
+        "reframe": 'You did something hard with "{echo}" and you are proud. That is evidence of who you are becoming. Rest. Recovery is part of the process. You do not need to earn this feeling by doing more.',
+        "task_text": "You finished part of your {work_obj}. Take this pride with you. Rest. Do not immediately push for more.",
+        "task_minutes": 1,
+        "why_this": "Proud completion is the moment to rest. Your {work_obj} progress is real and does not need proving.",
+    },
+
+    # -- RECOVERY: user is resting or recovering from effort --
+
+    ("overwhelmed", "recovery"): {
+        "reframe": 'You are recovering from overwhelm around "{echo}". This is not avoidance, this is necessary. Your brain needs space to process the volume before it can act on it.',
+        "task_text": "Rest. When you feel even slightly ready, open your {work_obj} and look at one small part for 1 minute.",
+        "task_minutes": 1,
+        "why_this": "Recovery after overwhelm is not weakness. Returning to your {work_obj} gently prevents relapse.",
+    },
+    ("anxious", "recovery"): {
+        "reframe": 'The anxiety around "{echo}" is still present but you are giving yourself space. Rest is part of the process. When a small window of calm appears, you can use it for one tiny action.',
+        "task_text": "Rest. When the anxiety eases slightly, open your {work_obj} for 1 minute. Until then, be here.",
+        "task_minutes": 1,
+        "why_this": "Anxious recovery needs patience. Gentle re-contact with your {work_obj} when calm appears.",
+    },
+    ("stuck", "recovery"): {
+        "reframe": 'You are resting after a period of stuckness on "{echo}". Sometimes the best thing for a stuck mind is to stop trying. The subconscious often finds the path when the conscious mind stops forcing it.',
+        "task_text": "Rest fully. When you return to your {work_obj}, try a completely different starting point.",
+        "task_minutes": 1,
+        "why_this": "Rest after stuckness lets the subconscious work on your {work_obj} in the background.",
+    },
+    ("stressed", "recovery"): {
+        "reframe": 'You are recovering from stress around "{echo}". The urgency is lying to you right now. You need this break. When you return, start with the easiest task first.',
+        "task_text": "Rest now. When you return to your {work_obj}, start with the easiest part. Do not re-enter through urgency.",
+        "task_minutes": 1,
+        "why_this": "Stressed recovery requires deliberate re-entry. Start with the easiest part of your {work_obj}.",
+    },
+    ("tired", "recovery"): {
+        "reframe": 'Rest is exactly what you need right now around "{echo}". This is not failure. This is your body telling you a truth your expectations are ignoring. Close everything and recover.',
+        "task_text": "Close your {work_obj}. Rest. The work will be easier when you return with energy.",
+        "task_minutes": 1,
+        "why_this": "Tired recovery is non-negotiable. Your {work_obj} benefits more from rest than from forced output.",
+    },
+    ("calm", "recovery"): {
+        "reframe": 'You are in a calm, restful state around "{echo}". Protect this. Do not let urgency pull you out before you are ready. When you choose to return, start gently.',
+        "task_text": "Stay in this calm. When you choose to return to your {work_obj}, take one gentle step. No pressure.",
+        "task_minutes": 1,
+        "why_this": "Calm recovery is ideal. Protect it and return to your {work_obj} when genuinely ready.",
+    },
+    ("frustrated", "recovery"): {
+        "reframe": 'You stepped back from frustration around "{echo}". That was a good call. The emotion was starting to work against you. Let it settle before returning.',
+        "task_text": "Rest until the frustration eases. When you return to your {work_obj}, try a different approach.",
+        "task_minutes": 1,
+        "why_this": "Recovery from frustrated work prevents your {work_obj} from becoming associated with anger.",
+    },
+    ("guilty", "recovery"): {
+        "reframe": 'Guilt is telling you that resting from "{echo}" is wrong. It is not. Recovery is not laziness. It is how you become capable of the next effort. Rest now and return without the weight of shame.',
+        "task_text": "Rest without guilt. When you return to your {work_obj}, one small action is enough to start.",
+        "task_minutes": 1,
+        "why_this": "Guilty recovery needs permission. Rest makes your next session on your {work_obj} better.",
+    },
+    ("unmotivated", "recovery"): {
+        "reframe": 'You have no drive around "{echo}" and you are resting. That is honest. Forcing motivation when there is none creates resistance. If a small spark appears, follow it. If not, that is okay for now.',
+        "task_text": "Rest. If a small spark of interest in your {work_obj} appears, follow it gently. If not, rest fully.",
+        "task_minutes": 1,
+        "why_this": "Unmotivated recovery should be free of pressure. Your {work_obj} will still be there.",
+    },
+    ("hopeful", "recovery"): {
+        "reframe": 'The hope around "{echo}" is there and so is the need to rest. You do not need to act on the hope right now. Recovery will give you the energy to act on it when you are ready.',
+        "task_text": "Rest. The hope about your {work_obj} will be here when you return. Recovery strengthens it.",
+        "task_minutes": 1,
+        "why_this": "Hopeful recovery lets the hope grow. Rest gives energy to act on your {work_obj} later.",
+    },
+    ("proud", "recovery"): {
+        "reframe": 'You have earned this rest after "{echo}". Do not skip recovery to chase the next thing. Pride that leads to burnout is not sustainable. Rest fully. The next effort will be better for it.',
+        "task_text": "Rest. You earned it with your {work_obj}. The next session will be stronger after real recovery.",
+        "task_minutes": 1,
+        "why_this": "Proud recovery prevents the pride-to-burnout cycle. Your {work_obj} benefits from genuine rest.",
+    },
+}
+
+
+def get_combined_intervention(journal_text, emotion, behaviour, user_id):
+    """Select intervention from emotion x behaviour matrix. Returns None if behaviour unavailable."""
+
+    # Edge case 1: behaviour model not loaded or prediction failed
+    if behaviour is None:
+        return None
+
+    # Edge case 2: empty or missing journal text
+    if not journal_text or not journal_text.strip():
+        return None
+
+    # Edge case 3: unexpected emotion or behaviour label from model
+    valid_emotions = [
+        "overwhelmed", "anxious", "stuck", "stressed", "tired", "calm",
+        "frustrated", "guilty", "unmotivated", "hopeful", "proud",
+    ]
+    valid_behaviours = [
+        "avoidance", "overwhelm", "action", "completion", "recovery", "rumination",
+    ]
+    if emotion not in valid_emotions or behaviour not in valid_behaviours:
+        return None
+
+    # Extract echo phrase from journal text (with fallback)
+    try:
+        echo = extract_echo_phrase(journal_text)
+    except Exception:
+        # Edge case 4: echo extraction fails on unusual input
+        first_sentence = journal_text.split(".")[0][:50] if journal_text else "what you wrote"
+        echo = first_sentence.strip() or "what you wrote"
+
+    # Extract work object from journal text (with fallback)
+    try:
+        work_obj = extract_work_object(journal_text)
+    except Exception:
+        # Edge case 5: work object extraction fails
+        work_obj = "task"
+
+    # Look up the (emotion, behaviour) combination in the matrix
+    key = (emotion, behaviour)
+    entry = INTERVENTION_MATRIX.get(key)
+
+    # Edge case 6: combination missing from matrix (should not happen with valid labels)
+    if entry is None:
+        return None
+
+    # Format templates with echo phrase and work object
+    try:
+        reframe = entry["reframe"].format(echo=echo)
+        task_text = entry["task_text"].format(work_obj=work_obj)
+        why_this = entry["why_this"].format(work_obj=work_obj)
+    except (KeyError, ValueError, IndexError):
+        # Edge case 7: template formatting fails on unexpected characters
+        return None
+
+    # Get user's identity belief for echo (basic version - Task 2.7 will personalise further)
+    identity_echo = None
+    if user_id:
+        try:
+            conn = get_db_connection()
+            try:
+                cur = conn.cursor()
+                cur.execute(
+                    "SELECT belief_text FROM identity_beliefs WHERE user_id = ? ORDER BY RANDOM() LIMIT 1",
+                    (user_id,),
+                )
+                row = cur.fetchone()
+                if row:
+                    belief = row["belief_text"].strip()
+                    identity_echo = f"You said {belief}. This moment is part of that."
+            finally:
+                conn.close()
+        except Exception:
+            # Edge case 8: database error when fetching belief
+            identity_echo = None
+
+    return {
+        "reframe": reframe,
+        "micro_task": {
+            "task_text": task_text,
+            "estimated_minutes": entry.get("task_minutes", 2),
+            "why_this": why_this,
+        },
+        "identity_echo": identity_echo,
+    }
 
 
 def get_affirmation(predicted_emotion: str, user_id: int = None) -> str:
@@ -829,6 +1655,26 @@ def get_affirmation(predicted_emotion: str, user_id: int = None) -> str:
                 "This calm is something to notice. This is what it feels like when things settle. "
                 "You said {belief}. Right now, you are living that."
             ),
+            "frustrated": (
+                "Frustration means you care about doing well. That energy is not wasted. "
+                "You said {belief}. Channel this feeling into one small action."
+            ),
+            "guilty": (
+                "Guilt means your values are still intact. That is not a bad thing. "
+                "You said {belief}. One step now is all it takes to start closing the gap."
+            ),
+            "unmotivated": (
+                "Not feeling motivated does not mean you have lost your way. "
+                "You said {belief}. Showing up without motivation is the hardest kind of showing up, and it still counts."
+            ),
+            "hopeful": (
+                "This hope is real. It is your brain noticing that things are shifting. "
+                "You said {belief}. This feeling is evidence that the belief is taking hold."
+            ),
+            "proud": (
+                "You earned this feeling. Hold on to it. "
+                "You said {belief}. Today, you lived that."
+            ),
         }
         template = personalised.get(
             predicted_emotion,
@@ -844,6 +1690,11 @@ def get_affirmation(predicted_emotion: str, user_id: int = None) -> str:
         "stressed": "I can pace myself and still get things done.",
         "tired": "I am allowed to pause without losing progress.",
         "calm": "I am becoming the version of myself I imagined.",
+        "frustrated": "I can use this energy to move forward, not against myself.",
+        "guilty": "I can start now. That is more powerful than guilt about yesterday.",
+        "unmotivated": "I do not need motivation to take one small step.",
+        "hopeful": "I trust this feeling. Things are starting to shift.",
+        "proud": "I did something hard today. That is who I am becoming.",
     }
     return generic.get(predicted_emotion, "I am doing my best and that is enough.")
 
@@ -1119,10 +1970,15 @@ def dashboard():
 def journal():
     user_id = session['user_id']
     predicted_emotion = None
+    predicted_behaviour = None
+    identity_echo = None
     reframe = None
     affirmation = None
     micro_task = None
     new_entry_id = None
+    paralysis_score = None
+    paralysis_label = None
+    paralysis_class = None
 
     if request.method == "POST":
         raw_text = request.form.get("entry_text", "")
@@ -1130,18 +1986,41 @@ def journal():
 
         if entry_text:
             predicted_emotion = predict_emotion(entry_text)
-            reframe = generate_reframe(entry_text, predicted_emotion)
+            predicted_behaviour = predict_behaviour(entry_text)
+
+            # Try combined intervention (emotion x behaviour matrix)
+            intervention = get_combined_intervention(
+                entry_text, predicted_emotion, predicted_behaviour, user_id
+            )
+
+            if intervention:
+                # Combined intervention available - both models working
+                reframe = intervention['reframe']
+                micro_task = intervention['micro_task']
+                identity_echo = intervention.get('identity_echo')
+            else:
+                # Fallback to emotion-only when behaviour model unavailable
+                reframe = generate_reframe(entry_text, predicted_emotion)
+                micro_task = generate_micro_task(entry_text, predicted_emotion)
+
             affirmation = get_affirmation(predicted_emotion, user_id)
-            micro_task = generate_micro_task(entry_text, predicted_emotion)
+
+            # Calculate paralysis score from emotion + behaviour + keywords + daily frequency
+            paralysis_score = calculate_paralysis_score(
+                predicted_emotion, predicted_behaviour, entry_text, user_id
+            )
+            paralysis_label, paralysis_class = get_paralysis_label(paralysis_score)
 
             conn = get_db_connection()
             try:
                 cur = conn.cursor()
                 cur.execute(
                     "INSERT INTO journal_entries "
-                    "(user_id, entry_text, predicted_emotion, reframe, micro_task_text, micro_task_minutes, created_at) "
-                    "VALUES (?, ?, ?, ?, ?, ?, ?)",
-                    (user_id, entry_text, predicted_emotion, reframe,
+                    "(user_id, entry_text, predicted_emotion, predicted_behaviour, "
+                    "paralysis_score, reframe, micro_task_text, micro_task_minutes, created_at) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    (user_id, entry_text, predicted_emotion, predicted_behaviour,
+                     paralysis_score, reframe,
                      micro_task['task_text'], micro_task['estimated_minutes'],
                      datetime.now().isoformat(timespec="seconds")),
                 )
@@ -1159,7 +2038,8 @@ def journal():
     try:
         cur = conn.cursor()
         cur.execute(
-            "SELECT id, entry_text, predicted_emotion, reframe, micro_task_text, micro_task_minutes, created_at "
+            "SELECT id, entry_text, predicted_emotion, predicted_behaviour, "
+            "paralysis_score, reframe, micro_task_text, micro_task_minutes, created_at "
             "FROM journal_entries WHERE user_id = ? ORDER BY id DESC;",
             (user_id,),
         )
@@ -1176,10 +2056,15 @@ def journal():
     return render_template(
         "journal.html",
         predicted_emotion=predicted_emotion,
+        predicted_behaviour=predicted_behaviour,
+        identity_echo=identity_echo,
         reframe=reframe,
         affirmation=affirmation,
         micro_task=micro_task,
         new_entry_id=new_entry_id,
+        paralysis_score=paralysis_score,
+        paralysis_label=paralysis_label,
+        paralysis_class=paralysis_class,
         entries=entries,
         emotional_streak=emotional_streak,
         journal_count=journal_count,
@@ -1212,14 +2097,32 @@ def edit_journal(entry_id):
 
         if entry_text:
             new_emotion = predict_emotion(entry_text)
-            new_reframe = generate_reframe(entry_text, new_emotion)
-            new_micro = generate_micro_task(entry_text, new_emotion)
+            new_behaviour = predict_behaviour(entry_text)
+
+            # Try combined intervention for edit too
+            edit_intervention = get_combined_intervention(
+                entry_text, new_emotion, new_behaviour, user_id
+            )
+            if edit_intervention:
+                new_reframe = edit_intervention['reframe']
+                new_micro = edit_intervention['micro_task']
+            else:
+                new_reframe = generate_reframe(entry_text, new_emotion)
+                new_micro = generate_micro_task(entry_text, new_emotion)
+
+            # Recalculate paralysis score for edited entry
+            new_paralysis = calculate_paralysis_score(
+                new_emotion, new_behaviour, entry_text, user_id
+            )
+
             cur.execute(
                 "UPDATE journal_entries "
-                "SET entry_text = ?, predicted_emotion = ?, reframe = ?, "
+                "SET entry_text = ?, predicted_emotion = ?, predicted_behaviour = ?, "
+                "paralysis_score = ?, reframe = ?, "
                 "micro_task_text = ?, micro_task_minutes = ? "
                 "WHERE id = ? AND user_id = ?;",
-                (entry_text, new_emotion, new_reframe,
+                (entry_text, new_emotion, new_behaviour,
+                 new_paralysis, new_reframe,
                  new_micro['task_text'], new_micro['estimated_minutes'],
                  entry_id, user_id),
             )

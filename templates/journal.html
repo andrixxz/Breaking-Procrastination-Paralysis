@@ -104,12 +104,41 @@
                 It sounds like you might be feeling
                 <span class="emotion-badge {{ predicted_emotion }}">{{ predicted_emotion }}</span>
                 right now.
-                {% if predicted_emotion == 'calm' %}
+                {% if predicted_emotion in ['calm', 'hopeful', 'proud'] %}
                 Notice that. It is worth holding on to.
                 {% else %}
                 Naming that is the first step.
                 {% endif %}
             </p>
+
+            {% if predicted_behaviour %}
+            <p class="reflection-behaviour">
+                Your writing suggests
+                <span class="behaviour-badge {{ predicted_behaviour }}">{{ predicted_behaviour }}</span>.
+            </p>
+            {% endif %}
+
+            {% if paralysis_score is not none %}
+            <div class="paralysis-score-card {{ paralysis_class }}">
+                <div class="paralysis-score-header">
+                    <span class="paralysis-score-label">Paralysis level</span>
+                    <span class="paralysis-score-value">{{ paralysis_score }}</span>
+                </div>
+                <div class="paralysis-bar-track">
+                    <div class="paralysis-bar-fill {{ paralysis_class }}" style="width: {{ ((paralysis_score + 5) / 10 * 100) | round }}%;"></div>
+                    <div class="paralysis-bar-midpoint"></div>
+                </div>
+                <div class="paralysis-bar-labels">
+                    <span>In flow</span>
+                    <span>{{ paralysis_label }}</span>
+                    <span>Frozen</span>
+                </div>
+                <details class="psych-explainer">
+                    <summary>Why this works</summary>
+                    <p>This score combines your emotional state, behaviour pattern, language signals and daily patterns into one number. Tracking it over time helps you notice what shifts your state.</p>
+                </details>
+            </div>
+            {% endif %}
 
             {% if reframe %}
             <p class="reflection-reframe">{{ reframe }}</p>
@@ -140,6 +169,10 @@
 
             {% if affirmation %}
             <p class="reflection-affirmation">"{{ affirmation }}"</p>
+            {% endif %}
+
+            {% if identity_echo %}
+            <p class="reflection-identity-echo">{{ identity_echo }}</p>
             {% endif %}
 
             <p style="text-align: center; margin-top: 12px;">
@@ -176,6 +209,9 @@
                         <div class="entry-meta">
                             <span>{{ entry["created_at"][:16] }}</span>
                             <span class="emotion-badge {{ entry['predicted_emotion'] }}">{{ entry["predicted_emotion"] }}</span>
+                            {% if entry["paralysis_score"] is not none %}
+                            <span class="paralysis-badge">{{ entry["paralysis_score"] }}</span>
+                            {% endif %}
                         </div>
                         <p class="entry-text">"{{ entry["entry_text"] }}"</p>
                         {% if entry["reframe"] %}
