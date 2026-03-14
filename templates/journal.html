@@ -96,6 +96,13 @@
             <a href="{{ url_for('today') }}" class="btn-text" style="margin-left: 16px;">Return to your space</a>
         </form>
 
+        <!-- error message (shown when validation or pipeline fails) -->
+        {% if error_message %}
+        <div class="validation-message fade-in-up">
+            <p>{{ error_message }}</p>
+        </div>
+        {% endif %}
+
         <!-- emotional reflection (appears after submission) -->
         {% if predicted_emotion %}
         <div class="reflection-card">
@@ -181,6 +188,18 @@
         </div>
         {% endif %}
 
+        <!-- temporal insight (shown when 2+ entries exist today) -->
+        {% if daily_insight %}
+        <div class="daily-insight {{ daily_insight.css_class }} fade-in-up">
+            <p class="daily-insight-label">Today's insight</p>
+            <p class="daily-insight-text">{{ daily_insight.message }}</p>
+            <details class="psych-explainer">
+                <summary>Why this works</summary>
+                <p>Tracking emotional transitions across the day helps you see patterns your brain cannot notice in the moment. This is neuroplasticity becoming visible.</p>
+            </details>
+        </div>
+        {% endif %}
+
         <!-- next step guidance (shown after a reflection is submitted) -->
         {% if predicted_emotion %}
         <div class="next-steps-card fade-in-up">
@@ -209,6 +228,9 @@
                         <div class="entry-meta">
                             <span>{{ entry["created_at"][:16] }}</span>
                             <span class="emotion-badge {{ entry['predicted_emotion'] }}">{{ entry["predicted_emotion"] }}</span>
+                            {% if entry["predicted_behaviour"] %}
+                            <span class="behaviour-badge {{ entry['predicted_behaviour'] }}">{{ entry["predicted_behaviour"] }}</span>
+                            {% endif %}
                             {% if entry["paralysis_score"] is not none %}
                             <span class="paralysis-badge">{{ entry["paralysis_score"] }}</span>
                             {% endif %}

@@ -493,6 +493,206 @@ def get_paralysis_label(score):
         return "High paralysis", "paralysis"
 
 
+# -- Temporal Analysis (Task 2.5) --
+# Detects emotion and behaviour transitions across same-day journal entries
+# and generates a personalised insight. Aligns with supervisor feedback:
+# "Journal entries same day should relate to each other."
+
+# Emotions grouped by valence for transition detection
+POSITIVE_EMOTIONS = {"calm", "hopeful", "proud"}
+NEGATIVE_EMOTIONS = {"overwhelmed", "anxious", "stuck", "stressed",
+                     "frustrated", "guilty", "unmotivated"}
+# "tired" is neutral - not in either group
+
+# Behaviour states grouped for transition detection
+POSITIVE_BEHAVIOURS = {"action", "completion", "recovery"}
+NEGATIVE_BEHAVIOURS = {"avoidance", "overwhelm", "rumination"}
+
+# -- Belief bridge templates for three-layer reframes (Task 2.7) --
+# Each bridge connects the user's identity belief to their current
+# behaviour state, creating a personalised closing sentence in the reframe.
+BELIEF_BRIDGES_BY_BEHAVIOUR = {
+    "avoidance": "Taking this small step is one way to live that out.",
+    "overwhelm": "Choosing just one thing right now is how that starts.",
+    "rumination": "Moving from thinking to doing, even briefly, is how that becomes real.",
+    "action": "What you are doing right now is proof of that.",
+    "completion": "What you just finished is evidence of that.",
+    "recovery": "Resting so you can return stronger is part of that.",
+}
+
+# Emotion-only bridges used when behaviour state is unavailable
+BELIEF_BRIDGES_BY_EMOTION = {
+    "calm": "This steadiness is part of that.",
+    "hopeful": "This feeling is evidence of that.",
+    "proud": "What you accomplished is proof of that.",
+    "overwhelmed": "Choosing one small thing right now is how that starts.",
+    "anxious": "One small action from here is how that becomes real.",
+    "stuck": "The next small step is how that becomes real.",
+    "stressed": "One rough action right now is how that starts.",
+    "tired": "Showing up even now is part of that.",
+    "frustrated": "Channeling this energy into one action is how that becomes real.",
+    "guilty": "One forward step right now is how that starts again.",
+    "unmotivated": "Acting without motivation is the strongest form of that.",
+}
+
+
+def get_daily_insight(user_id):
+    """Analyse today's journal entries and return a temporal insight message."""
+
+    today_str = date.today().isoformat()
+
+    try:
+        conn = get_db_connection()
+        try:
+            cur = conn.cursor()
+            cur.execute(
+                "SELECT predicted_emotion, predicted_behaviour, paralysis_score "
+                "FROM journal_entries "
+                "WHERE user_id = ? AND created_at LIKE ? "
+                "ORDER BY id ASC",
+                (user_id, today_str + "%"),
+            )
+            rows = cur.fetchall()
+        finally:
+            conn.close()
+    except Exception:
+        # DB error - return no insight rather than crashing
+        return None
+
+    # Need at least 2 entries to detect a transition
+    if len(rows) < 2:
+        return None
+
+    emotions = [row["predicted_emotion"] for row in rows if row["predicted_emotion"]]
+    behaviours = [row["predicted_behaviour"] for row in rows if row["predicted_behaviour"]]
+    scores = [row["paralysis_score"] for row in rows if row["paralysis_score"] is not None]
+
+    # Edge case: all emotions are None (should not happen, but safe to check)
+    if len(emotions) < 2:
+        return None
+
+    first_emotion = emotions[0]
+    last_emotion = emotions[-1]
+    entry_count = len(rows)
+
+    # Priority 1: Detect negative loop (same negative emotion 3+ times)
+    if entry_count >= 3:
+        # Check if the most common emotion appears 3+ times and is negative
+        emotion_counts = {}
+        for e in emotions:
+            emotion_counts[e] = emotion_counts.get(e, 0) + 1
+
+        most_common = max(emotion_counts, key=emotion_counts.get)
+        if emotion_counts[most_common] >= 3 and most_common in NEGATIVE_EMOTIONS:
+            return {
+                "type": "negative_loop",
+                "message": (
+                    f"You have been sitting with feeling {most_common} today. "
+                    "That is okay. Noticing it is the first step."
+                ),
+                "css_class": "insight-loop",
+            }
+
+    # Priority 2: Detect behaviour loop (same negative behaviour 3+ times)
+    if len(behaviours) >= 3:
+        behaviour_counts = {}
+        for b in behaviours:
+            behaviour_counts[b] = behaviour_counts.get(b, 0) + 1
+
+        most_common_beh = max(behaviour_counts, key=behaviour_counts.get)
+        if behaviour_counts[most_common_beh] >= 3 and most_common_beh in NEGATIVE_BEHAVIOURS:
+            return {
+                "type": "behaviour_loop",
+                "message": (
+                    f"You have been in a pattern of {most_common_beh} today. "
+                    "That is okay. Awareness is what breaks the cycle."
+                ),
+                "css_class": "insight-loop",
+            }
+
+    # Priority 3: Positive transition (negative -> positive emotion)
+    if first_emotion in NEGATIVE_EMOTIONS and last_emotion in POSITIVE_EMOTIONS:
+        return {
+            "type": "positive_transition",
+            "message": (
+                f"Today you moved from feeling {first_emotion} to feeling "
+                f"{last_emotion}. That is your brain building a new pathway."
+            ),
+            "css_class": "insight-positive",
+        }
+
+    # Priority 4: Behaviour shift (negative -> positive behaviour)
+    if len(behaviours) >= 2:
+        first_beh = behaviours[0]
+        last_beh = behaviours[-1]
+        if first_beh in NEGATIVE_BEHAVIOURS and last_beh in POSITIVE_BEHAVIOURS:
+            return {
+                "type": "behaviour_shift",
+                "message": (
+                    f"Today you shifted from {first_beh} to {last_beh}. "
+                    "That shift took courage. Your brain noticed."
+                ),
+                "css_class": "insight-positive",
+            }
+
+    # Priority 5: Paralysis score improvement (first score > last score, meaningful drop)
+    if len(scores) >= 2:
+        first_score = scores[0]
+        last_score = scores[-1]
+        # A drop of 2+ points is a meaningful improvement
+        if first_score - last_score >= 2:
+            return {
+                "type": "score_improvement",
+                "message": (
+                    "Your paralysis score dropped across today's entries. "
+                    "Each entry helped you process a little more."
+                ),
+                "css_class": "insight-positive",
+            }
+
+    # Priority 6: Emotion changed but not clearly positive or negative
+    if first_emotion != last_emotion:
+        return {
+            "type": "emotion_change",
+            "message": (
+                f"Today you moved from feeling {first_emotion} to feeling "
+                f"{last_emotion}. Emotions shift. Naming them is what matters."
+            ),
+            "css_class": "insight-neutral",
+        }
+
+    # Priority 7: Multiple entries, same emotion throughout (not negative loop since < 3)
+    if entry_count == 2 and first_emotion == last_emotion:
+        if first_emotion in POSITIVE_EMOTIONS:
+            return {
+                "type": "positive_consistency",
+                "message": (
+                    f"You journaled twice today and stayed in a {first_emotion} "
+                    "space both times. That steadiness is worth noticing."
+                ),
+                "css_class": "insight-positive",
+            }
+        else:
+            return {
+                "type": "processing",
+                "message": (
+                    f"You showed up twice today while feeling {first_emotion}. "
+                    "That takes something. You are processing, and that counts."
+                ),
+                "css_class": "insight-neutral",
+            }
+
+    # Fallback: multiple entries, general acknowledgment
+    return {
+        "type": "general",
+        "message": (
+            f"You journaled {entry_count} times today. Each entry helped you "
+            "understand yourself a little better."
+        ),
+        "css_class": "insight-neutral",
+    }
+
+
 def extract_echo_phrase(text: str) -> str:
     """
     Extract a phrase from journal entry to echo back in reframe.
@@ -893,6 +1093,70 @@ def generate_reframe(journal_text: str, emotion_label: str) -> str:
     # === NEUTRAL / OTHER ===
     else:
         return f'You wrote this down, which means part of you is still reaching toward change even when the path isn\'t clear. Awareness is the beginning of movement. You don\'t need a map or a plan. Just the next smallest step. Pick something near, something easy, or something unfinished. Do it for 10 minutes. Let action clarify what reflection can\'t.'
+
+
+def get_belief_for_reframe(user_id):
+    """Fetch a random identity belief from the user's stored beliefs."""
+    if not user_id:
+        return None
+    try:
+        conn = get_db_connection()
+        try:
+            cur = conn.cursor()
+            cur.execute(
+                "SELECT belief_text FROM identity_beliefs "
+                "WHERE user_id = ? ORDER BY RANDOM() LIMIT 1",
+                (user_id,),
+            )
+            row = cur.fetchone()
+            if row and row["belief_text"] and row["belief_text"].strip():
+                return row["belief_text"].strip()
+            return None
+        finally:
+            conn.close()
+    except Exception:
+        # Edge case: DB error fetching belief
+        return None
+
+
+def personalise_reframe(reframe, emotion, behaviour, user_id):
+    """
+    Weave the user's identity belief into the reframe text (Layer 3).
+    Takes a base reframe (already emotion + behaviour matched) and appends
+    a belief-bridge sentence that connects the user's own words to the
+    suggested action.
+    Returns the enhanced reframe string, or the original if no belief found.
+    """
+    if not reframe:
+        return reframe
+
+    belief = get_belief_for_reframe(user_id)
+    if not belief:
+        # No belief available - return Layer 1 + Layer 2 only
+        return reframe
+
+    # Edge case: sanitise belief text to prevent format string issues
+    safe_belief = belief.replace("{", "").replace("}", "")
+
+    # Edge case: empty belief after sanitisation
+    if not safe_belief.strip():
+        return reframe
+
+    # Ensure belief ends with a period for proper sentence flow
+    if not safe_belief.endswith(('.', '!', '?')):
+        safe_belief = safe_belief + '.'
+
+    # Select the appropriate bridge based on behaviour (preferred) or emotion
+    bridge = None
+    if behaviour and behaviour in BELIEF_BRIDGES_BY_BEHAVIOUR:
+        bridge = BELIEF_BRIDGES_BY_BEHAVIOUR[behaviour]
+    elif emotion and emotion in BELIEF_BRIDGES_BY_EMOTION:
+        bridge = BELIEF_BRIDGES_BY_EMOTION[emotion]
+    else:
+        # Edge case: unknown emotion and behaviour - generic bridge
+        bridge = "Showing up like this is part of that."
+
+    return f"{reframe} You said {safe_belief} {bridge}"
 
 
 def extract_work_object(text: str) -> str:
@@ -1577,26 +1841,8 @@ def get_combined_intervention(journal_text, emotion, behaviour, user_id):
         # Edge case 7: template formatting fails on unexpected characters
         return None
 
-    # Get user's identity belief for echo (basic version - Task 2.7 will personalise further)
-    identity_echo = None
-    if user_id:
-        try:
-            conn = get_db_connection()
-            try:
-                cur = conn.cursor()
-                cur.execute(
-                    "SELECT belief_text FROM identity_beliefs WHERE user_id = ? ORDER BY RANDOM() LIMIT 1",
-                    (user_id,),
-                )
-                row = cur.fetchone()
-                if row:
-                    belief = row["belief_text"].strip()
-                    identity_echo = f"You said {belief}. This moment is part of that."
-            finally:
-                conn.close()
-        except Exception:
-            # Edge case 8: database error when fetching belief
-            identity_echo = None
+    # Identity belief is now woven into the reframe by personalise_reframe()
+    # in the journal route (Task 2.7), so identity_echo is no longer needed here.
 
     return {
         "reframe": reframe,
@@ -1605,7 +1851,6 @@ def get_combined_intervention(journal_text, emotion, behaviour, user_id):
             "estimated_minutes": entry.get("task_minutes", 2),
             "why_this": why_this,
         },
-        "identity_echo": identity_echo,
     }
 
 
@@ -1950,6 +2195,9 @@ def dashboard():
         _, emotion, _ = last_entry
         today_affirmation = get_affirmation(emotion, user_id)
 
+    # Temporal analysis: detect emotion transitions across today's entries
+    daily_insight = get_daily_insight(user_id)
+
     return render_template(
         "dashboard.html",
         greeting=get_greeting(),
@@ -1961,6 +2209,7 @@ def dashboard():
         journal_count=journal_count,
         today_belief=today_belief,
         current_stage=current_stage,
+        daily_insight=daily_insight,
     )
 
 # main journaling page
@@ -1979,59 +2228,103 @@ def journal():
     paralysis_score = None
     paralysis_label = None
     paralysis_class = None
+    daily_insight = None
+    error_message = None
 
     if request.method == "POST":
         raw_text = request.form.get("entry_text", "")
         entry_text = normalise_entry_text(raw_text)
 
+        # Edge case: empty or whitespace-only text submitted
+        if not entry_text:
+            error_message = "It looks like you did not write anything. That is okay. When you are ready, even one word is enough."
+        # Edge case: extremely long text that could slow down ML models
+        elif len(entry_text) > 5000:
+            error_message = "That entry is quite long. Try keeping it under 5000 characters so the system can read it clearly."
+            entry_text = None
+
         if entry_text:
-            predicted_emotion = predict_emotion(entry_text)
+            # Step 1: Run emotion model (Model 1)
+            try:
+                predicted_emotion = predict_emotion(entry_text)
+            except Exception:
+                # Edge case: emotion model fails on unexpected input
+                predicted_emotion = None
+                error_message = "Something went wrong while reading your entry. Please try again."
+
+            # Step 2: Run behaviour model (Model 2)
             predicted_behaviour = predict_behaviour(entry_text)
 
-            # Try combined intervention (emotion x behaviour matrix)
-            intervention = get_combined_intervention(
-                entry_text, predicted_emotion, predicted_behaviour, user_id
-            )
-
-            if intervention:
-                # Combined intervention available - both models working
-                reframe = intervention['reframe']
-                micro_task = intervention['micro_task']
-                identity_echo = intervention.get('identity_echo')
-            else:
-                # Fallback to emotion-only when behaviour model unavailable
-                reframe = generate_reframe(entry_text, predicted_emotion)
-                micro_task = generate_micro_task(entry_text, predicted_emotion)
-
-            affirmation = get_affirmation(predicted_emotion, user_id)
-
-            # Calculate paralysis score from emotion + behaviour + keywords + daily frequency
-            paralysis_score = calculate_paralysis_score(
-                predicted_emotion, predicted_behaviour, entry_text, user_id
-            )
-            paralysis_label, paralysis_class = get_paralysis_label(paralysis_score)
-
-            conn = get_db_connection()
-            try:
-                cur = conn.cursor()
-                cur.execute(
-                    "INSERT INTO journal_entries "
-                    "(user_id, entry_text, predicted_emotion, predicted_behaviour, "
-                    "paralysis_score, reframe, micro_task_text, micro_task_minutes, created_at) "
-                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                    (user_id, entry_text, predicted_emotion, predicted_behaviour,
-                     paralysis_score, reframe,
-                     micro_task['task_text'], micro_task['estimated_minutes'],
-                     datetime.now().isoformat(timespec="seconds")),
+            # Only continue full pipeline if emotion was detected
+            if predicted_emotion:
+                # Step 3: Select intervention (combined matrix or emotion-only fallback)
+                intervention = get_combined_intervention(
+                    entry_text, predicted_emotion, predicted_behaviour, user_id
                 )
-                conn.commit()
-                new_entry_id = cur.lastrowid
-            finally:
-                conn.close()
 
-            # journaling counts as identity-aligned behaviour
-            update_alignment_score(user_id, 1)
-            update_emotional_streak_for_today(user_id)
+                if intervention:
+                    # Combined intervention - both models working
+                    reframe = intervention['reframe']
+                    micro_task = intervention['micro_task']
+                else:
+                    # Fallback to emotion-only when behaviour model unavailable
+                    reframe = generate_reframe(entry_text, predicted_emotion)
+                    micro_task = generate_micro_task(entry_text, predicted_emotion)
+
+                # Layer 3: Weave user's identity belief into the reframe (Task 2.7)
+                reframe = personalise_reframe(
+                    reframe, predicted_emotion, predicted_behaviour, user_id
+                )
+
+                # Step 4: Get personalised affirmation
+                affirmation = get_affirmation(predicted_emotion, user_id)
+
+                # Step 5: Calculate paralysis score
+                paralysis_score = calculate_paralysis_score(
+                    predicted_emotion, predicted_behaviour, entry_text, user_id
+                )
+                paralysis_label, paralysis_class = get_paralysis_label(paralysis_score)
+
+                # Edge case: micro_task is None if both intervention paths fail
+                if micro_task is None:
+                    micro_task = {
+                        "task_text": "Take one slow breath and notice how you feel.",
+                        "estimated_minutes": 1,
+                        "why_this": "When everything else is uncertain, your breath is something you can control.",
+                    }
+
+                # Step 6: Store all predictions in database
+                conn = get_db_connection()
+                try:
+                    cur = conn.cursor()
+                    cur.execute(
+                        "INSERT INTO journal_entries "
+                        "(user_id, entry_text, predicted_emotion, predicted_behaviour, "
+                        "paralysis_score, reframe, micro_task_text, micro_task_minutes, created_at) "
+                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                        (user_id, entry_text, predicted_emotion, predicted_behaviour,
+                         paralysis_score, reframe,
+                         micro_task['task_text'], micro_task['estimated_minutes'],
+                         datetime.now().isoformat(timespec="seconds")),
+                    )
+                    conn.commit()
+                    new_entry_id = cur.lastrowid
+                except Exception:
+                    # Edge case: DB insert fails (locked DB, disk full, etc.)
+                    error_message = "Your reflection was processed but could not be saved. Please try again."
+                    predicted_emotion = None
+                finally:
+                    conn.close()
+
+                # Only update scores and fetch insight if entry was saved
+                if new_entry_id:
+                    # journaling counts as identity-aligned behaviour
+                    update_alignment_score(user_id, 1)
+                    update_emotional_streak_for_today(user_id)
+
+                    # Step 7: Check same-day context for temporal insight
+                    # Called after save so the new entry is included
+                    daily_insight = get_daily_insight(user_id)
 
     # load journal history
     conn = get_db_connection()
@@ -2068,6 +2361,8 @@ def journal():
         entries=entries,
         emotional_streak=emotional_streak,
         journal_count=journal_count,
+        daily_insight=daily_insight,
+        error_message=error_message,
     )
 
 
@@ -2095,38 +2390,65 @@ def edit_journal(entry_id):
         raw_text = request.form.get("entry_text", "")
         entry_text = normalise_entry_text(raw_text)
 
-        if entry_text:
-            new_emotion = predict_emotion(entry_text)
+        # Edge case: empty text or text exceeding max length
+        if entry_text and len(entry_text) <= 5000:
+            # Step 1: Run emotion model
+            try:
+                new_emotion = predict_emotion(entry_text)
+            except Exception:
+                # Edge case: emotion model fails on unexpected input
+                new_emotion = None
+
+            # Step 2: Run behaviour model
             new_behaviour = predict_behaviour(entry_text)
 
-            # Try combined intervention for edit too
-            edit_intervention = get_combined_intervention(
-                entry_text, new_emotion, new_behaviour, user_id
-            )
-            if edit_intervention:
-                new_reframe = edit_intervention['reframe']
-                new_micro = edit_intervention['micro_task']
-            else:
-                new_reframe = generate_reframe(entry_text, new_emotion)
-                new_micro = generate_micro_task(entry_text, new_emotion)
+            if new_emotion:
+                # Step 3: Select intervention (combined or fallback)
+                edit_intervention = get_combined_intervention(
+                    entry_text, new_emotion, new_behaviour, user_id
+                )
+                if edit_intervention:
+                    new_reframe = edit_intervention['reframe']
+                    new_micro = edit_intervention['micro_task']
+                else:
+                    new_reframe = generate_reframe(entry_text, new_emotion)
+                    new_micro = generate_micro_task(entry_text, new_emotion)
 
-            # Recalculate paralysis score for edited entry
-            new_paralysis = calculate_paralysis_score(
-                new_emotion, new_behaviour, entry_text, user_id
-            )
+                # Layer 3: Weave user's identity belief into the edited reframe
+                new_reframe = personalise_reframe(
+                    new_reframe, new_emotion, new_behaviour, user_id
+                )
 
-            cur.execute(
-                "UPDATE journal_entries "
-                "SET entry_text = ?, predicted_emotion = ?, predicted_behaviour = ?, "
-                "paralysis_score = ?, reframe = ?, "
-                "micro_task_text = ?, micro_task_minutes = ? "
-                "WHERE id = ? AND user_id = ?;",
-                (entry_text, new_emotion, new_behaviour,
-                 new_paralysis, new_reframe,
-                 new_micro['task_text'], new_micro['estimated_minutes'],
-                 entry_id, user_id),
-            )
-            conn.commit()
+                # Step 4: Recalculate paralysis score for edited entry
+                new_paralysis = calculate_paralysis_score(
+                    new_emotion, new_behaviour, entry_text, user_id
+                )
+
+                # Edge case: micro_task is None if both intervention paths fail
+                if new_micro is None:
+                    new_micro = {
+                        "task_text": "Take one slow breath and notice how you feel.",
+                        "estimated_minutes": 1,
+                        "why_this": "When everything else is uncertain, your breath is something you can control.",
+                    }
+
+                # Step 5: Update entry in database
+                try:
+                    cur.execute(
+                        "UPDATE journal_entries "
+                        "SET entry_text = ?, predicted_emotion = ?, predicted_behaviour = ?, "
+                        "paralysis_score = ?, reframe = ?, "
+                        "micro_task_text = ?, micro_task_minutes = ? "
+                        "WHERE id = ? AND user_id = ?;",
+                        (entry_text, new_emotion, new_behaviour,
+                         new_paralysis, new_reframe,
+                         new_micro['task_text'], new_micro['estimated_minutes'],
+                         entry_id, user_id),
+                    )
+                    conn.commit()
+                except Exception:
+                    # Edge case: DB update fails - redirect without changes
+                    pass
 
         conn.close()
         return redirect(url_for("journal"))

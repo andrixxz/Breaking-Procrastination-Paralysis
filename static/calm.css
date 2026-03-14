@@ -2312,6 +2312,19 @@ input::placeholder {
     line-height: 1.7;
 }
 
+/* Validation message - gentle error feedback on journal form */
+.validation-message {
+    background: var(--cream);
+    border-radius: var(--radius-md);
+    border-left: 3px solid var(--emotion-unmotivated, #90A4AE);
+    padding: 16px 20px;
+    margin-bottom: var(--space-md);
+    font-size: 0.95rem;
+    color: var(--text-secondary);
+    line-height: 1.7;
+    text-align: center;
+}
+
 /* --- Habit Goal Context (Habits page) --- */
 .habit-name-text {
     display: block;
@@ -2667,4 +2680,49 @@ input::placeholder {
     color: var(--text-secondary, #555);
     font-weight: 400;
     vertical-align: middle;
+}
+
+/* -- Daily Insight Card (Temporal Analysis, Task 2.5) -- */
+/* Shows emotional transitions detected across same-day journal entries */
+
+.daily-insight {
+    background: var(--cream, #FAF9F6);
+    border-radius: var(--radius-lg, 16px);
+    padding: var(--space-md, 20px) var(--space-lg, 24px);
+    border-left: 4px solid var(--text-muted, #999);
+    margin-bottom: var(--space-md, 20px);
+}
+
+.daily-insight-label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted, #999);
+    margin-bottom: 8px;
+    font-weight: 500;
+}
+
+.daily-insight-text {
+    font-size: 1rem;
+    line-height: 1.6;
+    color: var(--text-primary, #1F1F1F);
+    margin: 0;
+}
+
+/* Positive transition or improvement detected */
+.daily-insight.insight-positive {
+    border-left-color: var(--sage-green, #7C9A82);
+    background: rgba(124, 154, 130, 0.06);
+}
+
+/* Negative loop detected - gentle, not alarming */
+.daily-insight.insight-loop {
+    border-left-color: var(--emotion-unmotivated, #90A4AE);
+    background: rgba(144, 164, 174, 0.06);
+}
+
+/* Neutral or general insight */
+.daily-insight.insight-neutral {
+    border-left-color: var(--text-muted, #999);
+    background: rgba(0, 0, 0, 0.02);
 }
