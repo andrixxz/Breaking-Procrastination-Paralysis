@@ -18,7 +18,9 @@
             <li><a href="{{ url_for('today') }}">Today</a></li>
             <li><a href="{{ url_for('journal') }}">Reflect</a></li>
             <li><a href="{{ url_for('habits') }}">Tiny Steps</a></li>
+            <li><a href="{{ url_for('goals_page') }}">Intentions</a></li>
             <li><a href="{{ url_for('week') }}">Week</a></li>
+            <li><a href="{{ url_for('month') }}">Month</a></li>
             <li><a href="{{ url_for('analytics') }}">Patterns</a></li>
             <li><a href="{{ url_for('logout') }}" class="logout-link">Log out</a></li>
         </ul>
@@ -90,6 +92,9 @@
                 </li>
                 {% endfor %}
             </ul>
+            <a href="{{ url_for('goals_page') }}" class="btn-text" style="display: block; text-align: center; margin-top: 16px; font-size: 0.9rem;">
+                Break these down into small steps
+            </a>
         </div>
         {% endif %}
 

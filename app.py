@@ -2,6 +2,7 @@ from flask import Flask, render_template, request, redirect, url_for, session, f
 import sqlite3
 import joblib
 import os
+import calendar as cal_module
 from datetime import datetime, date, timedelta
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
@@ -136,6 +137,36 @@ def init_db():
         );
     """)
 
+    # goal steps - breaking intentions into small actionable pieces
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS goal_steps (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            goal_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            step_text TEXT NOT NULL,
+            step_order INTEGER NOT NULL DEFAULT 1,
+            frequency TEXT NOT NULL DEFAULT 'one-off',
+            due_date TEXT,
+            day_of_week INTEGER,
+            is_done INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL,
+            FOREIGN KEY (goal_id) REFERENCES goals(id),
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        );
+    """)
+
+    # tracks when daily/weekly steps get completed each day (same idea as habit_completions)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS step_completions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            step_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            completed_date TEXT NOT NULL,
+            FOREIGN KEY (step_id) REFERENCES goal_steps(id),
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        );
+    """)
+
     conn.commit()
     conn.close()
 
@@ -208,7 +239,49 @@ def migrate_db_for_onboarding():
     if 'paralysis_score' not in journal_columns:
         cur.execute("ALTER TABLE journal_entries ADD COLUMN paralysis_score REAL")
 
-    # 7. Create todos table
+    # 7. Add is_hidden column to habits so users can dismiss suggestions
+    cur.execute("PRAGMA table_info(habits)")
+    habit_cols_check = [col[1] for col in cur.fetchall()]
+    if 'is_hidden' not in habit_cols_check:
+        cur.execute("ALTER TABLE habits ADD COLUMN is_hidden INTEGER DEFAULT 0")
+
+    # 8. Create goal_steps table for breaking goals into small steps
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS goal_steps (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            goal_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            step_text TEXT NOT NULL,
+            step_order INTEGER NOT NULL DEFAULT 1,
+            frequency TEXT NOT NULL DEFAULT 'one-off',
+            due_date TEXT,
+            day_of_week INTEGER,
+            is_done INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL,
+            FOREIGN KEY (goal_id) REFERENCES goals(id),
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        );
+    """)
+
+    # add day_of_week column if it doesnt exist yet (for weekly step scheduling)
+    cur.execute("PRAGMA table_info(goal_steps)")
+    gs_columns = [col[1] for col in cur.fetchall()]
+    if 'day_of_week' not in gs_columns:
+        cur.execute("ALTER TABLE goal_steps ADD COLUMN day_of_week INTEGER")
+
+    # 8b. step completions - per-day tracking for daily/weekly steps (like habit_completions)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS step_completions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            step_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            completed_date TEXT NOT NULL,
+            FOREIGN KEY (step_id) REFERENCES goal_steps(id),
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        );
+    """)
+
+    # 9. Create todos table
     cur.execute("""
         CREATE TABLE IF NOT EXISTS todos (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -321,6 +394,13 @@ def get_next_onboarding_step(user_id):
 
         if habits_count == 0:
             return url_for('onboarding_habits')
+
+        # Check if goal steps exist (at least one step across all goals)
+        cur.execute("SELECT COUNT(*) as count FROM goal_steps WHERE user_id = ?", (user_id,))
+        steps_count = cur.fetchone()['count']
+
+        if steps_count == 0:
+            return url_for('onboarding_steps')
 
         # All steps complete - shouldn't reach here
         return url_for('today')
@@ -2553,6 +2633,13 @@ def toggle_todo(todo_id):
     redirect_to = request.form.get("redirect", "today")
     if redirect_to == "week":
         return redirect(url_for("week"))
+    if redirect_to == "month":
+        # send them back to the same month they were viewing
+        r_year = request.form.get("redirect_year", "")
+        r_month = request.form.get("redirect_month", "")
+        if r_year and r_month:
+            return redirect(url_for("month", year=r_year, month=r_month))
+        return redirect(url_for("month"))
     if not was_done:
         return redirect(url_for("today", todo_done="1"))
     return redirect(url_for("today"))
@@ -2620,6 +2707,26 @@ def add_manual_todo():
     return redirect(url_for("today"))
 
 
+@app.route("/habit/<int:habit_id>/hide", methods=["POST"])
+@login_required
+def hide_habit(habit_id):
+    """Hide a suggested habit the user doesnt want to see"""
+    user_id = session['user_id']
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+        # only let users hide sample habits that belong to them
+        cur.execute(
+            "UPDATE habits SET is_hidden = 1 "
+            "WHERE id = ? AND user_id = ? AND is_sample = 1",
+            (habit_id, user_id)
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    return redirect(url_for("habits"))
+
+
 # --- Today + Week pages ---
 
 @app.route("/today")
@@ -2651,18 +2758,55 @@ def today():
         )
         done_todos = cur.fetchall()
 
-        # All active habits
+        # goal steps that should show up today
+        # daily = always, weekly = only if today matches day_of_week,
+        # one-off = show if due today/overdue or no date set
+        today_weekday = date.today().weekday()  # 0=Mon, 6=Sun
+        cur.execute("""
+            SELECT gs.id, gs.step_text, gs.frequency, gs.due_date,
+                   gs.is_done, gs.day_of_week, g.goal_text
+            FROM goal_steps gs
+            JOIN goals g ON gs.goal_id = g.id
+            WHERE gs.user_id = ? AND gs.is_done = 0
+            AND (
+                gs.frequency = 'daily'
+                OR (gs.frequency = 'weekly' AND (gs.day_of_week IS NULL OR gs.day_of_week = ?))
+                OR (gs.frequency = 'one-off' AND (gs.due_date IS NULL OR gs.due_date <= ?))
+            )
+            ORDER BY gs.frequency ASC, gs.step_order ASC
+        """, (user_id, today_weekday, today_str))
+        today_goal_steps = [dict(row) for row in cur.fetchall()]
+
+        # check which daily/weekly steps were already done today
         cur.execute(
-            "SELECT id, name, is_sample FROM habits WHERE user_id = ? ORDER BY is_sample ASC, id ASC",
+            "SELECT step_id FROM step_completions "
+            "WHERE user_id = ? AND completed_date = ?",
+            (user_id, today_str)
+        )
+        completed_step_ids = {row['step_id'] for row in cur.fetchall()}
+
+        # mark each step with its completion status for today
+        for step in today_goal_steps:
+            if step['frequency'] in ('daily', 'weekly'):
+                step['is_completed_today'] = step['id'] in completed_step_ids
+            else:
+                step['is_completed_today'] = False
+
+        # all active habits (skip hidden ones)
+        cur.execute(
+            "SELECT id, name, is_sample FROM habits "
+            "WHERE user_id = ? AND (is_hidden IS NULL OR is_hidden = 0) "
+            "ORDER BY is_sample ASC, id ASC",
             (user_id,),
         )
         habits_rows = cur.fetchall()
 
-        # Which habits are completed today
+        # which habits are completed today (only count visible ones)
         cur.execute(
             "SELECT habit_id FROM habit_completions hc "
             "JOIN habits h ON hc.habit_id = h.id "
-            "WHERE h.user_id = ? AND date(hc.completed_at) = ?",
+            "WHERE h.user_id = ? AND date(hc.completed_at) = ? "
+            "AND (h.is_hidden IS NULL OR h.is_hidden = 0)",
             (user_id, today_str),
         )
         completed_habit_ids = {row['habit_id'] for row in cur.fetchall()}
@@ -2767,6 +2911,7 @@ def today():
 
     todo_done = request.args.get("todo_done") == "1"
     habit_done = request.args.get("habit_done") == "1"
+    step_done = request.args.get("step_done") == "1"
 
     return render_template(
         "today.html",
@@ -2779,6 +2924,8 @@ def today():
         alignment_score=alignment_score,
         emotional_streak=emotional_streak,
         today_str=today_str,
+        # goal steps for today
+        today_goal_steps=today_goal_steps,
         # Weekly summary data
         show_weekly_summary=show_weekly_summary,
         week_days=week_days,
@@ -2793,6 +2940,7 @@ def today():
         # Win acknowledgment flags
         todo_done=todo_done,
         habit_done=habit_done,
+        step_done=step_done,
         current_stage=current_stage,
     )
 
@@ -2801,61 +2949,496 @@ def today():
 @login_required
 @onboarding_check
 def week():
+    """weekly planner - everything grouped by day, mon to sun"""
     user_id = session['user_id']
     today_obj = date.today()
     today_str = today_obj.isoformat()
-    week_end = (today_obj + timedelta(days=7)).isoformat()
-    week_start = (today_obj - timedelta(days=6)).isoformat()
+
+    # monday through sunday of the current week
+    week_start_obj = today_obj - timedelta(days=today_obj.weekday())
+    week_end_obj = week_start_obj + timedelta(days=6)
+    week_start = week_start_obj.isoformat()
+    week_end = week_end_obj.isoformat()
 
     conn = get_db_connection()
-    cur = conn.cursor()
+    try:
+        cur = conn.cursor()
 
-    # Tasks due this week (next 7 days)
-    cur.execute(
-        "SELECT id, text, due_date, is_done, created_at "
-        "FROM todos WHERE user_id = ? AND due_date IS NOT NULL AND due_date BETWEEN ? AND ? "
-        "ORDER BY due_date ASC, created_at ASC",
-        (user_id, today_str, week_end),
-    )
-    week_todos = cur.fetchall()
+        # all todos that fall in this week
+        cur.execute(
+            "SELECT id, text, due_date, is_done, source "
+            "FROM todos WHERE user_id = ? AND due_date BETWEEN ? AND ? "
+            "ORDER BY due_date ASC, created_at ASC",
+            (user_id, week_start, week_end),
+        )
+        all_week_todos = cur.fetchall()
 
-    # All tasks not done with no due date
-    cur.execute(
-        "SELECT id, text, due_date, is_done, created_at "
-        "FROM todos WHERE user_id = ? AND is_done = 0 AND due_date IS NULL "
-        "ORDER BY created_at DESC LIMIT 15",
-        (user_id,),
-    )
-    undated_todos = cur.fetchall()
+        # active goal steps - daily on every day, weekly on their assigned day, one-off by due date
+        cur.execute("""
+            SELECT gs.id, gs.step_text, gs.frequency, gs.due_date,
+                   gs.is_done, gs.day_of_week, g.goal_text
+            FROM goal_steps gs
+            JOIN goals g ON gs.goal_id = g.id
+            WHERE gs.user_id = ? AND gs.is_done = 0
+            AND (
+                gs.frequency = 'daily'
+                OR gs.frequency = 'weekly'
+                OR (gs.frequency = 'one-off' AND gs.due_date BETWEEN ? AND ?)
+            )
+            ORDER BY gs.step_order ASC
+        """, (user_id, week_start, week_end))
+        week_goal_steps = [dict(row) for row in cur.fetchall()]
 
-    # Habit completion summary for last 7 days
-    cur.execute(
-        "SELECT h.id, h.name, COUNT(hc.id) as completions "
-        "FROM habits h "
-        "LEFT JOIN habit_completions hc ON h.id = hc.habit_id AND date(hc.completed_at) >= ? "
-        "WHERE h.user_id = ? "
-        "GROUP BY h.id ORDER BY h.id ASC",
-        (week_start, user_id),
-    )
-    habit_summary = cur.fetchall()
+        # which steps were completed on which days this week
+        cur.execute(
+            "SELECT step_id, completed_date FROM step_completions "
+            "WHERE user_id = ? AND completed_date BETWEEN ? AND ?",
+            (user_id, week_start, week_end)
+        )
+        week_step_comps = cur.fetchall()
 
-    # Journal count this week
-    cur.execute(
-        "SELECT COUNT(*) as count FROM journal_entries "
-        "WHERE user_id = ? AND date(created_at) >= ?",
-        (user_id, week_start),
-    )
-    journal_count = cur.fetchone()['count']
+        # bucket step completions by date for quick lookup
+        step_comps_by_date = {}
+        for sc in week_step_comps:
+            d = sc['completed_date']
+            if d not in step_comps_by_date:
+                step_comps_by_date[d] = set()
+            step_comps_by_date[d].add(sc['step_id'])
 
-    conn.close()
+        # journal entries this week with emotion for the colour dots
+        cur.execute(
+            "SELECT id, entry_text, predicted_emotion, "
+            "date(created_at) as entry_date "
+            "FROM journal_entries WHERE user_id = ? "
+            "AND date(created_at) BETWEEN ? AND ? "
+            "ORDER BY created_at ASC",
+            (user_id, week_start, week_end),
+        )
+        week_journals = cur.fetchall()
+
+        # habit completions per day this week (only visible habits)
+        cur.execute(
+            "SELECT h.name, date(hc.completed_at) as comp_date "
+            "FROM habit_completions hc "
+            "JOIN habits h ON hc.habit_id = h.id "
+            "WHERE h.user_id = ? AND date(hc.completed_at) BETWEEN ? AND ? "
+            "AND (h.is_hidden IS NULL OR h.is_hidden = 0)",
+            (user_id, week_start, week_end),
+        )
+        week_habit_comps = cur.fetchall()
+
+        # total visible habits for the completion fraction
+        cur.execute(
+            "SELECT COUNT(*) as count FROM habits "
+            "WHERE user_id = ? AND (is_hidden IS NULL OR is_hidden = 0)",
+            (user_id,),
+        )
+        total_habits = cur.fetchone()['count']
+
+        # undated todos that still need doing
+        cur.execute(
+            "SELECT id, text, is_done, created_at "
+            "FROM todos WHERE user_id = ? AND is_done = 0 AND due_date IS NULL "
+            "ORDER BY created_at DESC LIMIT 15",
+            (user_id,),
+        )
+        undated_todos = cur.fetchall()
+
+    finally:
+        conn.close()
+
+    # sort todos into buckets by date
+    todos_by_date = {}
+    for todo in all_week_todos:
+        d = todo['due_date']
+        if d not in todos_by_date:
+            todos_by_date[d] = []
+        todos_by_date[d].append(todo)
+
+    # sort journal entries into buckets by date
+    journals_by_date = {}
+    for entry in week_journals:
+        d = entry['entry_date']
+        if d not in journals_by_date:
+            journals_by_date[d] = []
+        journals_by_date[d].append(entry)
+
+    # count habit completions per day
+    habits_by_date = {}
+    for comp in week_habit_comps:
+        d = comp['comp_date']
+        habits_by_date[d] = habits_by_date.get(d, 0) + 1
+
+    # split steps into groups by frequency
+    daily_steps = [s for s in week_goal_steps if s['frequency'] == 'daily']
+    weekly_steps = [s for s in week_goal_steps if s['frequency'] == 'weekly']
+    one_off_by_date = {}
+    for s in week_goal_steps:
+        if s['frequency'] == 'one-off' and s['due_date']:
+            d = s['due_date']
+            if d not in one_off_by_date:
+                one_off_by_date[d] = []
+            one_off_by_date[d].append(s)
+
+    # group weekly steps by their assigned day (0=Mon, 6=Sun)
+    weekly_by_dow = {}
+    for s in weekly_steps:
+        dow = s.get('day_of_week')
+        if dow is not None:
+            if dow not in weekly_by_dow:
+                weekly_by_dow[dow] = []
+            weekly_by_dow[dow].append(s)
+        else:
+            # no day assigned yet so show on all days (backwards compat)
+            for d in range(7):
+                if d not in weekly_by_dow:
+                    weekly_by_dow[d] = []
+                weekly_by_dow[d].append(s)
+
+    # build the 7 day cards
+    day_names = ['Monday', 'Tuesday', 'Wednesday', 'Thursday',
+                 'Friday', 'Saturday', 'Sunday']
+    today_index = 0
+    week_days = []
+
+    for i in range(7):
+        day_date = week_start_obj + timedelta(days=i)
+        day_str = day_date.isoformat()
+        is_today = (day_str == today_str)
+        if is_today:
+            today_index = i
+
+        # figure out which steps go on this day
+        completed_today = step_comps_by_date.get(day_str, set())
+
+        if day_date < today_obj:
+            # past days - only show one-off steps that were due then
+            day_steps = []
+            for s in one_off_by_date.get(day_str, []):
+                sc = dict(s)
+                sc['is_completed_today'] = bool(s['is_done'])
+                day_steps.append(sc)
+        else:
+            # today or future - show daily + weekly (for this day) + one-off
+            day_steps = []
+            for s in daily_steps:
+                sc = dict(s)
+                sc['is_completed_today'] = s['id'] in completed_today
+                day_steps.append(sc)
+            for s in weekly_by_dow.get(i, []):
+                sc = dict(s)
+                sc['is_completed_today'] = s['id'] in completed_today
+                day_steps.append(sc)
+            for s in one_off_by_date.get(day_str, []):
+                sc = dict(s)
+                sc['is_completed_today'] = False
+                day_steps.append(sc)
+
+        week_days.append({
+            'date': day_str,
+            'date_display': day_date.strftime('%d %b'),
+            'name': day_names[i],
+            'is_today': is_today,
+            'is_past': day_date < today_obj,
+            'todos': todos_by_date.get(day_str, []),
+            'goal_steps': day_steps,
+            'journals': journals_by_date.get(day_str, []),
+            'habits_done': habits_by_date.get(day_str, 0),
+            'habits_total': total_habits,
+        })
+
+    # summary stats for the top of the page
+    total_journal_entries = len(week_journals)
+    total_habits_done = sum(d['habits_done'] for d in week_days)
 
     return render_template(
         "week.html",
-        week_todos=week_todos,
+        week_days=week_days,
         undated_todos=undated_todos,
-        habit_summary=habit_summary,
-        journal_count=journal_count,
         today_str=today_str,
+        today_index=today_index,
+        total_journal_entries=total_journal_entries,
+        total_habits_done=total_habits_done,
+        total_habits=total_habits,
+    )
+
+
+@app.route("/month")
+@login_required
+@onboarding_check
+def month():
+    """monthly calendar - see the whole month at a glance"""
+    user_id = session['user_id']
+    today_obj = date.today()
+    today_str = today_obj.isoformat()
+
+    # let users navigate to other months via query params
+    try:
+        view_year = int(request.args.get('year', today_obj.year))
+        view_month = int(request.args.get('month', today_obj.month))
+    except (ValueError, TypeError):
+        view_year = today_obj.year
+        view_month = today_obj.month
+
+    # keep it in a sensible range
+    if view_month < 1 or view_month > 12:
+        view_month = today_obj.month
+    if view_year < 2020 or view_year > 2030:
+        view_year = today_obj.year
+
+    # first and last day of the month we're looking at
+    month_start = date(view_year, view_month, 1)
+    if view_month == 12:
+        month_end = date(view_year + 1, 1, 1) - timedelta(days=1)
+    else:
+        month_end = date(view_year, view_month + 1, 1) - timedelta(days=1)
+
+    month_start_str = month_start.isoformat()
+    month_end_str = month_end.isoformat()
+
+    # work out prev and next month for navigation arrows
+    if view_month == 1:
+        prev_year, prev_month = view_year - 1, 12
+    else:
+        prev_year, prev_month = view_year, view_month - 1
+
+    if view_month == 12:
+        next_year, next_month = view_year + 1, 1
+    else:
+        next_year, next_month = view_year, view_month + 1
+
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+
+        # journal entries for this month
+        cur.execute(
+            "SELECT id, entry_text, predicted_emotion, predicted_behaviour, "
+            "paralysis_score, date(created_at) as entry_date, created_at "
+            "FROM journal_entries WHERE user_id = ? "
+            "AND date(created_at) BETWEEN ? AND ? "
+            "ORDER BY created_at ASC",
+            (user_id, month_start_str, month_end_str),
+        )
+        month_journals = cur.fetchall()
+
+        # todos that fall in this month
+        cur.execute(
+            "SELECT id, text, due_date, is_done, source "
+            "FROM todos WHERE user_id = ? AND due_date BETWEEN ? AND ? "
+            "ORDER BY due_date ASC",
+            (user_id, month_start_str, month_end_str),
+        )
+        month_todos = cur.fetchall()
+
+        # goal steps - one-off due this month, plus daily/weekly (always active)
+        cur.execute("""
+            SELECT gs.id, gs.step_text, gs.frequency, gs.due_date,
+                   gs.is_done, gs.day_of_week, g.goal_text
+            FROM goal_steps gs
+            JOIN goals g ON gs.goal_id = g.id
+            WHERE gs.user_id = ? AND gs.is_done = 0
+            AND (
+                (gs.frequency = 'one-off' AND gs.due_date BETWEEN ? AND ?)
+                OR gs.frequency = 'daily'
+                OR gs.frequency = 'weekly'
+            )
+            ORDER BY gs.step_order ASC
+        """, (user_id, month_start_str, month_end_str))
+        month_steps = [dict(row) for row in cur.fetchall()]
+
+        # step completions for this month so we can show what was done
+        cur.execute(
+            "SELECT step_id, completed_date FROM step_completions "
+            "WHERE user_id = ? AND completed_date BETWEEN ? AND ?",
+            (user_id, month_start_str, month_end_str)
+        )
+        month_step_comps = cur.fetchall()
+
+        # bucket step completions by date
+        month_sc_by_date = {}
+        for sc in month_step_comps:
+            d = sc['completed_date']
+            if d not in month_sc_by_date:
+                month_sc_by_date[d] = set()
+            month_sc_by_date[d].add(sc['step_id'])
+
+        # habit completions this month (only visible habits)
+        cur.execute(
+            "SELECT h.name, date(hc.completed_at) as comp_date "
+            "FROM habit_completions hc "
+            "JOIN habits h ON hc.habit_id = h.id "
+            "WHERE h.user_id = ? AND date(hc.completed_at) BETWEEN ? AND ? "
+            "AND (h.is_hidden IS NULL OR h.is_hidden = 0)",
+            (user_id, month_start_str, month_end_str),
+        )
+        month_habit_comps = cur.fetchall()
+
+        # total visible habits for the fraction
+        cur.execute(
+            "SELECT COUNT(*) as count FROM habits "
+            "WHERE user_id = ? AND (is_hidden IS NULL OR is_hidden = 0)",
+            (user_id,),
+        )
+        total_habits = cur.fetchone()['count']
+
+    finally:
+        conn.close()
+
+    # bucket journals by date
+    journals_by_date = {}
+    for entry in month_journals:
+        d = entry['entry_date']
+        if d not in journals_by_date:
+            journals_by_date[d] = []
+        journals_by_date[d].append(entry)
+
+    # bucket todos by date
+    todos_by_date = {}
+    for todo in month_todos:
+        d = todo['due_date']
+        if d not in todos_by_date:
+            todos_by_date[d] = []
+        todos_by_date[d].append(todo)
+
+    # count habit completions per day
+    habits_by_date = {}
+    for comp in month_habit_comps:
+        d = comp['comp_date']
+        habits_by_date[d] = habits_by_date.get(d, 0) + 1
+
+    # split goal steps by type
+    month_daily_steps = [s for s in month_steps if s['frequency'] == 'daily']
+    month_weekly_steps = [s for s in month_steps if s['frequency'] == 'weekly']
+    one_off_steps_by_date = {}
+    for s in month_steps:
+        if s['frequency'] == 'one-off' and s['due_date']:
+            d = s['due_date']
+            if d not in one_off_steps_by_date:
+                one_off_steps_by_date[d] = []
+            one_off_steps_by_date[d].append(s)
+
+    # group weekly steps by their assigned day of week
+    month_weekly_by_dow = {}
+    for s in month_weekly_steps:
+        dow = s.get('day_of_week')
+        if dow is not None:
+            if dow not in month_weekly_by_dow:
+                month_weekly_by_dow[dow] = []
+            month_weekly_by_dow[dow].append(s)
+        else:
+            # no day assigned - show on all days (backwards compat)
+            for d in range(7):
+                if d not in month_weekly_by_dow:
+                    month_weekly_by_dow[d] = []
+                month_weekly_by_dow[d].append(s)
+
+    # build the calendar grid using python's calendar module
+    cal_grid = cal_module.monthcalendar(view_year, view_month)
+    month_name = cal_module.month_name[view_month]
+    day_headers = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+
+    calendar_weeks = []
+    for week_row in cal_grid:
+        week_days = []
+        for day_num in week_row:
+            if day_num == 0:
+                # padding - day belongs to prev/next month
+                week_days.append(None)
+            else:
+                day_date = date(view_year, view_month, day_num)
+                day_str = day_date.isoformat()
+                is_today = (day_str == today_str)
+                is_past = (day_date < today_obj)
+                day_dow = day_date.weekday()
+
+                day_journals = journals_by_date.get(day_str, [])
+                day_todos = todos_by_date.get(day_str, [])
+                day_habits_done = habits_by_date.get(day_str, 0)
+                completed_today = month_sc_by_date.get(day_str, set())
+
+                # past days only get one-off steps, today/future get daily/weekly too
+                if is_past:
+                    day_steps = []
+                    for s in one_off_steps_by_date.get(day_str, []):
+                        sc = dict(s)
+                        sc['is_completed_today'] = bool(s['is_done'])
+                        day_steps.append(sc)
+                else:
+                    day_steps = []
+                    for s in month_daily_steps:
+                        sc = dict(s)
+                        sc['is_completed_today'] = s['id'] in completed_today
+                        day_steps.append(sc)
+                    for s in month_weekly_by_dow.get(day_dow, []):
+                        sc = dict(s)
+                        sc['is_completed_today'] = s['id'] in completed_today
+                        day_steps.append(sc)
+                    for s in one_off_steps_by_date.get(day_str, []):
+                        sc = dict(s)
+                        sc['is_completed_today'] = False
+                        day_steps.append(sc)
+
+                # get unique emotions for the indicator dots
+                emotions = []
+                seen = set()
+                for j in day_journals:
+                    e = j['predicted_emotion']
+                    if e and e not in seen:
+                        emotions.append(e)
+                        seen.add(e)
+
+                active_todos = [t for t in day_todos if not t['is_done']]
+                done_todos = [t for t in day_todos if t['is_done']]
+
+                week_days.append({
+                    'num': day_num,
+                    'date': day_str,
+                    'date_display': day_date.strftime('%d %b'),
+                    'day_name': cal_module.day_name[day_date.weekday()],
+                    'is_today': is_today,
+                    'is_past': is_past,
+                    'journals': day_journals,
+                    'todos': day_todos,
+                    'goal_steps': day_steps,
+                    'habits_done': day_habits_done,
+                    'habits_total': total_habits,
+                    'emotions': emotions,
+                    'active_todos': len(active_todos),
+                    'done_todos': len(done_todos),
+                    'active_steps': len(day_steps),
+                    'has_data': bool(day_journals or day_todos or day_steps or day_habits_done > 0),
+                })
+        calendar_weeks.append(week_days)
+
+    # monthly summary stats
+    total_entries = len(month_journals)
+    total_habits_completed = sum(habits_by_date.values())
+
+    # average paralysis score if any entries have one
+    scores = [j['paralysis_score'] for j in month_journals if j['paralysis_score'] is not None]
+    avg_paralysis = round(sum(scores) / len(scores), 1) if scores else None
+
+    days_journaled = len(journals_by_date)
+
+    return render_template(
+        "month.html",
+        calendar_weeks=calendar_weeks,
+        day_headers=day_headers,
+        month_name=month_name,
+        view_year=view_year,
+        view_month=view_month,
+        today_str=today_str,
+        prev_year=prev_year,
+        prev_month=prev_month,
+        next_year=next_year,
+        next_month=next_month,
+        total_entries=total_entries,
+        total_habits_completed=total_habits_completed,
+        total_habits=total_habits,
+        avg_paralysis=avg_paralysis,
+        days_journaled=days_journaled,
+        is_current_month=(view_year == today_obj.year and view_month == today_obj.month),
     )
 
 
@@ -2913,14 +3496,14 @@ def habits():
             conn.close()
             return redirect(url_for("habits", acknowledged="1"))
 
-    # show all habits for this user
+    # show habits for this user (skip hidden ones)
     conn = get_db_connection()
     cur = conn.cursor()
     cur.execute("""
         SELECT h.id, h.name, h.is_sample, h.created_at, g.goal_text
         FROM habits h
         LEFT JOIN goals g ON h.linked_goal_id = g.id
-        WHERE h.user_id = ?
+        WHERE h.user_id = ? AND (h.is_hidden IS NULL OR h.is_hidden = 0)
         ORDER BY h.id ASC
     """, (user_id,))
     habits_rows = cur.fetchall()
@@ -2976,6 +3559,353 @@ def analytics():
 
 
 # ====================================
+# GOAL BREAKDOWN ROUTES
+# ====================================
+
+@app.route("/goals")
+@login_required
+@onboarding_check
+def goals_page():
+    """Show all goals with their steps so users can break things down"""
+    user_id = session['user_id']
+
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+
+        # grab all goals for this user
+        cur.execute(
+            "SELECT id, goal_text FROM goals WHERE user_id = ? ORDER BY id ASC",
+            (user_id,)
+        )
+        goals = cur.fetchall()
+
+        # grab all steps grouped by goal
+        cur.execute(
+            "SELECT id, goal_id, step_text, step_order, frequency, due_date, day_of_week, is_done, created_at "
+            "FROM goal_steps WHERE user_id = ? ORDER BY goal_id ASC, step_order ASC",
+            (user_id,)
+        )
+        all_steps = [dict(row) for row in cur.fetchall()]
+
+        # check which daily/weekly steps are completed today
+        today_str = date.today().isoformat()
+        cur.execute(
+            "SELECT step_id FROM step_completions "
+            "WHERE user_id = ? AND completed_date = ?",
+            (user_id, today_str)
+        )
+        completed_today_ids = {row['step_id'] for row in cur.fetchall()}
+
+        # also grab identity beliefs so we can show them under each goal
+        cur.execute(
+            "SELECT linked_goal_id, belief_text FROM identity_beliefs WHERE user_id = ?",
+            (user_id,)
+        )
+        beliefs_map = {row['linked_goal_id']: row['belief_text'] for row in cur.fetchall()}
+
+    finally:
+        conn.close()
+
+    # organise steps by goal_id and mark daily/weekly completion for today
+    steps_by_goal = {}
+    for step in all_steps:
+        if step['frequency'] in ('daily', 'weekly'):
+            step['is_completed_today'] = step['id'] in completed_today_ids
+        else:
+            step['is_completed_today'] = bool(step['is_done'])
+        gid = step['goal_id']
+        if gid not in steps_by_goal:
+            steps_by_goal[gid] = []
+        steps_by_goal[gid].append(step)
+
+    # check for win acknowledgment or error from redirects
+    step_done = request.args.get("step_done") == "1"
+    step_deleted = request.args.get("step_deleted") == "1"
+    error_message = request.args.get("error")
+
+    return render_template(
+        "goals.html",
+        goals=goals,
+        steps_by_goal=steps_by_goal,
+        beliefs_map=beliefs_map,
+        step_done=step_done,
+        step_deleted=step_deleted,
+        error_message=error_message,
+    )
+
+
+@app.route("/goals/add-step", methods=["POST"])
+@login_required
+def add_goal_step():
+    """Add a new micro-step to a goal"""
+    user_id = session['user_id']
+    goal_id = request.form.get("goal_id")
+    step_text = request.form.get("step_text", "").strip()
+    frequency = request.form.get("frequency", "one-off").strip()
+    due_date = request.form.get("due_date", "").strip() or None
+
+    # validate goal_id is a real number
+    try:
+        goal_id = int(goal_id)
+    except (TypeError, ValueError):
+        return redirect(url_for("goals_page", error="Something went wrong. Please try again."))
+
+    # don't accept empty text
+    if not step_text:
+        return redirect(url_for("goals_page", error="Please write something for the step."))
+
+    # keep step text reasonable
+    if len(step_text) > 500:
+        return redirect(url_for("goals_page", error="That step is a bit long. Try keeping it under 500 characters."))
+
+    # only allow valid frequency values
+    if frequency not in ('daily', 'weekly', 'one-off'):
+        frequency = 'one-off'
+
+    # daily steps dont need a due date or day_of_week
+    if frequency == 'daily':
+        due_date = None
+
+    # figure out which day of week for weekly steps (0=Mon, 6=Sun)
+    day_of_week = None
+    if frequency == 'weekly':
+        due_date = None  # weekly uses day_of_week, not due_date
+        try:
+            day_of_week = int(request.form.get("day_of_week", date.today().weekday()))
+            if day_of_week < 0 or day_of_week > 6:
+                day_of_week = date.today().weekday()
+        except (TypeError, ValueError):
+            day_of_week = date.today().weekday()
+
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+
+        # make sure this goal actually belongs to the user
+        cur.execute("SELECT id FROM goals WHERE id = ? AND user_id = ?", (goal_id, user_id))
+        if cur.fetchone() is None:
+            return redirect(url_for("goals_page", error="That intention was not found."))
+
+        # figure out the next step order number for this goal
+        cur.execute(
+            "SELECT COALESCE(MAX(step_order), 0) as max_order FROM goal_steps "
+            "WHERE goal_id = ? AND user_id = ?",
+            (goal_id, user_id)
+        )
+        next_order = cur.fetchone()['max_order'] + 1
+
+        now = datetime.now().isoformat(timespec="seconds")
+        cur.execute(
+            "INSERT INTO goal_steps (goal_id, user_id, step_text, step_order, frequency, due_date, day_of_week, is_done, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?)",
+            (goal_id, user_id, step_text, next_order, frequency, due_date, day_of_week, now)
+        )
+        conn.commit()
+    except Exception:
+        return redirect(url_for("goals_page", error="Could not save that step. Please try again."))
+    finally:
+        conn.close()
+
+    return redirect(url_for("goals_page"))
+
+
+@app.route("/goals/toggle-step/<int:step_id>", methods=["POST"])
+@login_required
+def toggle_goal_step(step_id):
+    """Toggle a goal step done or not done"""
+    user_id = session['user_id']
+    today_str = date.today().isoformat()
+
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+
+        # check the step exists and belongs to this user
+        cur.execute(
+            "SELECT is_done, frequency FROM goal_steps WHERE id = ? AND user_id = ?",
+            (step_id, user_id)
+        )
+        row = cur.fetchone()
+        if row is None:
+            return redirect(url_for("goals_page"))
+
+        step_freq = row['frequency']
+        was_done = False
+
+        if step_freq in ('daily', 'weekly'):
+            # recurring steps track completion per day in step_completions
+            cur.execute(
+                "SELECT id FROM step_completions "
+                "WHERE step_id = ? AND user_id = ? AND completed_date = ?",
+                (step_id, user_id, today_str)
+            )
+            existing = cur.fetchone()
+
+            if existing:
+                # already done today so undo it
+                cur.execute("DELETE FROM step_completions WHERE id = ?", (existing['id'],))
+                was_done = True
+            else:
+                # mark it done for today
+                cur.execute(
+                    "INSERT INTO step_completions (step_id, user_id, completed_date) "
+                    "VALUES (?, ?, ?)",
+                    (step_id, user_id, today_str)
+                )
+                was_done = False
+        else:
+            # one-off steps just flip is_done like before
+            was_done = bool(row['is_done'])
+            cur.execute(
+                "UPDATE goal_steps SET is_done = CASE WHEN is_done = 0 THEN 1 ELSE 0 END "
+                "WHERE id = ? AND user_id = ?",
+                (step_id, user_id)
+            )
+
+        conn.commit()
+    finally:
+        conn.close()
+
+    # only bump alignment when marking done, not when un-checking
+    if not was_done:
+        update_alignment_score(user_id, 1)
+
+    # figure out where to send the user back to
+    redirect_to = request.form.get("redirect", "goals")
+    if redirect_to == "today":
+        if not was_done:
+            return redirect(url_for("today", step_done="1"))
+        return redirect(url_for("today"))
+    if redirect_to == "week":
+        return redirect(url_for("week"))
+    if redirect_to == "month":
+        r_year = request.form.get("redirect_year", "")
+        r_month = request.form.get("redirect_month", "")
+        if r_year and r_month:
+            return redirect(url_for("month", year=r_year, month=r_month))
+        return redirect(url_for("month"))
+
+    if not was_done:
+        return redirect(url_for("goals_page", step_done="1"))
+    return redirect(url_for("goals_page"))
+
+
+@app.route("/goals/delete-step/<int:step_id>", methods=["POST"])
+@login_required
+def delete_goal_step(step_id):
+    """Remove a step from a goal"""
+    user_id = session['user_id']
+
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+
+        # make sure this step belongs to the user before deleting
+        cur.execute(
+            "SELECT id, is_done, frequency FROM goal_steps WHERE id = ? AND user_id = ?",
+            (step_id, user_id)
+        )
+        row = cur.fetchone()
+        if row is None:
+            return redirect(url_for("goals_page"))
+
+        # count how many times this step was completed (for alignment adjustment)
+        completion_count = 0
+        if row['frequency'] in ('daily', 'weekly'):
+            cur.execute(
+                "SELECT COUNT(*) as count FROM step_completions WHERE step_id = ? AND user_id = ?",
+                (step_id, user_id)
+            )
+            completion_count = cur.fetchone()['count']
+            # clean up completion records before deleting the step
+            cur.execute("DELETE FROM step_completions WHERE step_id = ? AND user_id = ?", (step_id, user_id))
+
+        cur.execute("DELETE FROM goal_steps WHERE id = ? AND user_id = ?", (step_id, user_id))
+        conn.commit()
+    finally:
+        conn.close()
+
+    # reduce alignment by the number of completions being removed
+    if row['frequency'] in ('daily', 'weekly') and completion_count > 0:
+        update_alignment_score(user_id, -completion_count)
+    elif row['frequency'] == 'one-off' and row['is_done']:
+        update_alignment_score(user_id, -1)
+
+    return redirect(url_for("goals_page", step_deleted="1"))
+
+
+@app.route("/goals/edit-step/<int:step_id>", methods=["POST"])
+@login_required
+def edit_goal_step(step_id):
+    """Update a step's text, frequency, or due date"""
+    user_id = session['user_id']
+    new_text = request.form.get("step_text", "").strip()
+    new_frequency = request.form.get("frequency", "").strip()
+    new_due_date = request.form.get("due_date", "").strip() or None
+
+    if not new_text:
+        return redirect(url_for("goals_page", error="Step text cannot be empty."))
+
+    if len(new_text) > 500:
+        return redirect(url_for("goals_page", error="That step is a bit long. Try keeping it under 500 characters."))
+
+    if new_frequency not in ('daily', 'weekly', 'one-off'):
+        new_frequency = 'one-off'
+
+    # daily steps dont use due_date or day_of_week
+    new_day_of_week = None
+    if new_frequency == 'daily':
+        new_due_date = None
+
+    # weekly steps use day_of_week instead of due_date
+    if new_frequency == 'weekly':
+        new_due_date = None
+        try:
+            new_day_of_week = int(request.form.get("day_of_week", date.today().weekday()))
+            if new_day_of_week < 0 or new_day_of_week > 6:
+                new_day_of_week = date.today().weekday()
+        except (TypeError, ValueError):
+            new_day_of_week = date.today().weekday()
+
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+
+        # only update if this step belongs to the user
+        cur.execute(
+            "SELECT id, frequency, is_done FROM goal_steps WHERE id = ? AND user_id = ?",
+            (step_id, user_id)
+        )
+        row = cur.fetchone()
+        if row is None:
+            return redirect(url_for("goals_page"))
+
+        old_freq = row['frequency']
+
+        # if switching from one-off (done) to daily/weekly, reset is_done so it shows up again
+        if old_freq == 'one-off' and new_frequency in ('daily', 'weekly') and row['is_done']:
+            cur.execute("UPDATE goal_steps SET is_done = 0 WHERE id = ?", (step_id,))
+
+        # if switching away from daily/weekly, clean up old step_completions
+        if old_freq in ('daily', 'weekly') and new_frequency == 'one-off':
+            cur.execute("DELETE FROM step_completions WHERE step_id = ? AND user_id = ?", (step_id, user_id))
+
+        cur.execute(
+            "UPDATE goal_steps SET step_text = ?, frequency = ?, due_date = ?, day_of_week = ? "
+            "WHERE id = ? AND user_id = ?",
+            (new_text, new_frequency, new_due_date, new_day_of_week, step_id, user_id)
+        )
+        conn.commit()
+    except Exception:
+        return redirect(url_for("goals_page", error="Could not update that step. Please try again."))
+    finally:
+        conn.close()
+
+    return redirect(url_for("goals_page"))
+
+
+# ====================================
 # ONBOARDING ROUTES
 # ====================================
 
@@ -2992,7 +3922,7 @@ def onboarding_goals():
 
         if not goal_1 or not goal_2 or not goal_3:
             flash("Please enter all 3 goals.", "error")
-            return render_template("onboarding_goals.html", step=1, total_steps=4)
+            return render_template("onboarding_goals.html", step=1, total_steps=5)
 
         # Delete existing goals if any (allow re-doing this step)
         conn = get_db_connection()
@@ -3021,7 +3951,7 @@ def onboarding_goals():
     return render_template(
         "onboarding_goals.html",
         step=1,
-        total_steps=4,
+        total_steps=5,
         existing_goals=existing_goals if existing_goals else ["", "", ""]
     )
 
@@ -3053,7 +3983,7 @@ def onboarding_beliefs():
 
         if len(beliefs_data) < len(goals):
             flash("Please create an identity belief for each goal.", "error")
-            return render_template("onboarding_beliefs.html", step=2, total_steps=4, goals=goals)
+            return render_template("onboarding_beliefs.html", step=2, total_steps=5, goals=goals)
 
         # Delete existing beliefs and insert new ones
         conn = get_db_connection()
@@ -3085,7 +4015,7 @@ def onboarding_beliefs():
     return render_template(
         "onboarding_beliefs.html",
         step=2,
-        total_steps=4,
+        total_steps=5,
         goals=goals,
         existing_beliefs=existing_beliefs
     )
@@ -3121,7 +4051,7 @@ def onboarding_thoughts():
 
         if len(thoughts_data) < len(beliefs):
             flash("Please add at least one positive thought for each belief.", "error")
-            return render_template("onboarding_thoughts.html", step=3, total_steps=4, beliefs=beliefs)
+            return render_template("onboarding_thoughts.html", step=3, total_steps=5, beliefs=beliefs)
 
         # Delete existing thoughts and insert new ones
         conn = get_db_connection()
@@ -3153,7 +4083,7 @@ def onboarding_thoughts():
     return render_template(
         "onboarding_thoughts.html",
         step=3,
-        total_steps=4,
+        total_steps=5,
         beliefs=beliefs,
         existing_thoughts=existing_thoughts
     )
@@ -3186,7 +4116,7 @@ def onboarding_habits():
 
         if len(habits_data) < len(goals):
             flash("Please create at least one habit for each goal.", "error")
-            return render_template("onboarding_habits.html", step=4, total_steps=4, goals=goals)
+            return render_template("onboarding_habits.html", step=4, total_steps=5, goals=goals)
 
         # Delete existing custom habits (is_sample = 0) and insert new ones
         conn = get_db_connection()
@@ -3201,13 +4131,10 @@ def onboarding_habits():
                 (user_id, habit_text, goal_id, now)
             )
 
-        # Mark onboarding as complete
-        cur.execute("UPDATE users SET onboarding_complete = 1 WHERE id = ?", (user_id,))
         conn.commit()
         conn.close()
 
-        flash("Onboarding complete! Welcome to your journey.", "success")
-        return redirect(url_for('today'))
+        return redirect(url_for('onboarding_steps'))
 
     # GET: load existing custom habits if any
     conn = get_db_connection()
@@ -3222,9 +4149,130 @@ def onboarding_habits():
     return render_template(
         "onboarding_habits.html",
         step=4,
-        total_steps=4,
+        total_steps=5,
         goals=goals,
         existing_habits=existing_habits
+    )
+
+
+@app.route("/onboarding/steps", methods=["GET", "POST"])
+@login_required
+def onboarding_steps():
+    """Step 5: Break each goal into small actionable steps"""
+    user_id = session['user_id']
+
+    # load goals so we can show them
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+
+        cur.execute("SELECT id, goal_text FROM goals WHERE user_id = ? ORDER BY id ASC", (user_id,))
+        goals = cur.fetchall()
+
+        if not goals:
+            flash("Please complete the goals step first.", "error")
+            return redirect(url_for('onboarding_goals'))
+
+        # check habits exist (can't skip to step 5 without step 4)
+        cur.execute("SELECT COUNT(*) as count FROM habits WHERE user_id = ? AND is_sample = 0", (user_id,))
+        if cur.fetchone()['count'] == 0:
+            flash("Please complete the habits step first.", "error")
+            return redirect(url_for('onboarding_habits'))
+
+        if request.method == "POST":
+            now = datetime.now().isoformat(timespec="seconds")
+            steps_added = 0
+
+            # delete existing steps and their completions (allow re-doing this step)
+            cur.execute("DELETE FROM step_completions WHERE user_id = ?", (user_id,))
+            cur.execute("DELETE FROM goal_steps WHERE user_id = ?", (user_id,))
+
+            for goal in goals:
+                goal_id = goal['id']
+                step_index = 1
+
+                # each goal can have up to 5 steps from the form
+                while step_index <= 5:
+                    field_name = f"step_{goal_id}_{step_index}"
+                    step_text = request.form.get(field_name, "").strip()
+
+                    if step_text:
+                        # cap step text at 500 chars
+                        step_text = step_text[:500]
+
+                        # grab frequency for this step
+                        freq_field = f"freq_{goal_id}_{step_index}"
+                        frequency = request.form.get(freq_field, "one-off").strip()
+                        if frequency not in ('daily', 'weekly', 'one-off'):
+                            frequency = 'one-off'
+
+                        # weekly steps need a day of week
+                        day_of_week = None
+                        if frequency == 'weekly':
+                            dow_field = f"dow_{goal_id}_{step_index}"
+                            try:
+                                day_of_week = int(request.form.get(dow_field, 0))
+                                if day_of_week < 0 or day_of_week > 6:
+                                    day_of_week = 0
+                            except (TypeError, ValueError):
+                                day_of_week = 0
+
+                        cur.execute(
+                            "INSERT INTO goal_steps (goal_id, user_id, step_text, step_order, frequency, day_of_week, is_done, created_at) "
+                            "VALUES (?, ?, ?, ?, ?, ?, 0, ?)",
+                            (goal_id, user_id, step_text, step_index, frequency, day_of_week, now)
+                        )
+                        steps_added += 1
+
+                    step_index += 1
+
+            # need at least one step total across all goals
+            if steps_added == 0:
+                flash("Please add at least one step for any of your intentions.", "error")
+                return render_template(
+                    "onboarding_steps.html",
+                    step=5,
+                    total_steps=5,
+                    goals=goals,
+                    existing_steps={}
+                )
+
+            # mark onboarding as complete
+            cur.execute("UPDATE users SET onboarding_complete = 1 WHERE id = ?", (user_id,))
+            conn.commit()
+
+            flash("Onboarding complete! Welcome to your journey.", "success")
+            return redirect(url_for('today'))
+
+        # GET: load any existing steps (if user is re-doing this step)
+        cur.execute(
+            "SELECT goal_id, step_order, step_text, frequency, day_of_week FROM goal_steps "
+            "WHERE user_id = ? ORDER BY goal_id ASC, step_order ASC",
+            (user_id,)
+        )
+        rows = cur.fetchall()
+
+        # organise as {goal_id: {step_order: {text, frequency, day_of_week}}}
+        existing_steps = {}
+        for row in rows:
+            gid = row['goal_id']
+            if gid not in existing_steps:
+                existing_steps[gid] = {}
+            existing_steps[gid][row['step_order']] = {
+                'text': row['step_text'],
+                'frequency': row['frequency'],
+                'day_of_week': row['day_of_week']
+            }
+
+    finally:
+        conn.close()
+
+    return render_template(
+        "onboarding_steps.html",
+        step=5,
+        total_steps=5,
+        goals=goals,
+        existing_steps=existing_steps
     )
 
 

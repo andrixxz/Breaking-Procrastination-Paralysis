@@ -21,7 +21,9 @@
             <li><a href="{{ url_for('today') }}" class="active">Today</a></li>
             <li><a href="{{ url_for('journal') }}">Reflect</a></li>
             <li><a href="{{ url_for('habits') }}">Tiny Steps</a></li>
+            <li><a href="{{ url_for('goals_page') }}">Intentions</a></li>
             <li><a href="{{ url_for('week') }}">Week</a></li>
+            <li><a href="{{ url_for('month') }}">Month</a></li>
             <li><a href="{{ url_for('analytics') }}">Patterns</a></li>
             <li><a href="{{ url_for('logout') }}" class="logout-link">Log out</a></li>
         </ul>
@@ -74,7 +76,11 @@
         {% endif %}
 
         <!-- win acknowledgment (shown immediately after completing an action) -->
-        {% if todo_done %}
+        {% if step_done %}
+        <div class="win-card fade-in-up">
+            <p class="win-card-text">One step forward. That counts.</p>
+        </div>
+        {% elif todo_done %}
         <div class="win-card fade-in-up">
             <p class="win-card-text">One step forward. That counts.</p>
         </div>
@@ -144,6 +150,55 @@
         </div>
         {% endif %}
 
+        <!-- goal steps for today -->
+        {% if today_goal_steps %}
+        <div class="card" style="padding: 24px;">
+            <h2>Goal Steps</h2>
+            <p class="section-subtitle" style="margin-bottom: 16px;">
+                Small steps from your intentions. These move you forward gently.
+            </p>
+
+            <ul class="habit-list">
+                {% for step in today_goal_steps %}
+                <li class="habit-item {{ 'step-done-today' if step['is_completed_today'] }}">
+                    <form method="post" action="{{ url_for('toggle_goal_step', step_id=step['id']) }}" style="display: flex; align-items: center; gap: 12px; width: 100%;">
+                        <input type="hidden" name="redirect" value="today">
+                        {% if step['is_completed_today'] %}
+                        <button type="submit" class="habit-checkbox checked" style="border: none; cursor: pointer;">
+                            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7L5.5 10.5L12 3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        </button>
+                        <span class="habit-label" style="text-decoration: line-through; opacity: 0.6;">
+                        {% else %}
+                        <button type="submit" class="habit-checkbox" style="border: none; cursor: pointer;"></button>
+                        <span class="habit-label">
+                        {% endif %}
+                            {{ step['step_text'] }}
+                            <span class="source-badge goal">intention</span>
+                            <span class="source-badge frequency-{{ step['frequency'] }}">{{ step['frequency'] }}</span>
+                            {% if step['frequency'] == 'weekly' and step['day_of_week'] is not none %}
+                                <span class="source-badge day-badge">{{ ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][step['day_of_week']] }}</span>
+                            {% endif %}
+                            {% if step['frequency'] == 'one-off' and step['due_date'] and step['due_date'] < today_str %}
+                                <span class="source-badge overdue">overdue</span>
+                            {% endif %}
+                        </span>
+                    </form>
+                    <p class="step-goal-context">{{ step['goal_text'] }}</p>
+                    {% if step['frequency'] == 'one-off' and step['due_date'] and step['due_date'] < today_str %}
+                    <p class="overdue-message">
+                        This was planned for {{ step['due_date'] }}. No pressure - you can do it today or
+                        <a href="{{ url_for('goals_page') }}">reschedule</a>.
+                    </p>
+                    {% endif %}
+                </li>
+                {% endfor %}
+            </ul>
+            <p style="margin-top: 12px;">
+                <a href="{{ url_for('goals_page') }}" class="btn-text">Manage intentions</a>
+            </p>
+        </div>
+        {% endif %}
+
         <!-- today's to-do list -->
         <div class="card" style="padding: 24px;">
             <h2>To-Do</h2>
@@ -160,10 +215,16 @@
                         <span class="habit-label">
                             {{ todo['text'] }}
                             {% if todo['source'] == 'journal' %}
-                                <span class="habit-tag">from journal</span>
+                                <span class="source-badge journal">from journal</span>
+                            {% else %}
+                                <span class="source-badge manual">manual</span>
                             {% endif %}
                             {% if todo['due_date'] %}
-                                <span class="habit-tag">due {{ todo['due_date'] }}</span>
+                                {% if todo['due_date'] < today_str %}
+                                    <span class="source-badge overdue">overdue</span>
+                                {% else %}
+                                    <span class="source-badge due">due {{ todo['due_date'] }}</span>
+                                {% endif %}
                             {% endif %}
                         </span>
                     </form>
@@ -217,8 +278,9 @@
                         >
                         <label class="habit-label">
                             {{ h['name'] }}
+                            <span class="source-badge habit">habit</span>
                             {% if h['is_sample'] %}
-                                <span class="habit-tag">suggestion</span>
+                                <span class="source-badge suggestion">suggestion</span>
                             {% endif %}
                         </label>
                     </form>

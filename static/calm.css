@@ -2726,3 +2726,1167 @@ input::placeholder {
     border-left-color: var(--text-muted, #999);
     background: rgba(0, 0, 0, 0.02);
 }
+
+/* ========================================
+   Goal Breakdown Page
+   ======================================== */
+
+.goal-breakdown-card {
+    padding: var(--space-md);
+    margin-bottom: var(--space-md);
+}
+
+.goal-breakdown-header {
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.goal-breakdown-title {
+    font-size: 1.15rem;
+    font-weight: 500;
+    color: var(--text-primary);
+    margin: 0 0 8px 0;
+    line-height: 1.4;
+}
+
+.goal-breakdown-belief {
+    font-family: 'Lora', Georgia, serif;
+    font-style: italic;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    margin: 0;
+    line-height: 1.5;
+}
+
+/* step list */
+.goal-steps-list {
+    list-style: none;
+    margin: 0 0 20px 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+.goal-step-item {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    padding: 12px 0;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+    transition: background 0.2s;
+}
+
+.goal-step-item:last-of-type {
+    border-bottom: none;
+}
+
+.goal-step-item:hover {
+    background: rgba(124, 154, 130, 0.03);
+    border-radius: var(--radius-md);
+}
+
+.goal-step-done {
+    opacity: 0.6;
+}
+
+.goal-step-left {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    flex: 1;
+    min-width: 0;
+}
+
+.goal-step-check-form {
+    margin: 0;
+    padding: 0;
+    flex-shrink: 0;
+}
+
+.goal-step-checkbox {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: 2px solid var(--sage-green);
+    background: transparent;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    transition: all 0.2s;
+    color: white;
+    margin-top: 2px;
+}
+
+.goal-step-checkbox:hover {
+    background: rgba(124, 154, 130, 0.15);
+}
+
+.goal-step-checkbox.checked {
+    background: var(--sage-green);
+    border-color: var(--sage-green);
+}
+
+.goal-step-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.goal-step-text {
+    font-size: 0.95rem;
+    color: var(--text-primary);
+    line-height: 1.5;
+    display: block;
+}
+
+.goal-step-text.text-done {
+    text-decoration: line-through;
+    color: var(--text-muted);
+}
+
+.goal-step-meta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 4px;
+    flex-wrap: wrap;
+}
+
+.step-frequency-badge {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-weight: 500;
+}
+
+.step-frequency-badge.daily {
+    background: rgba(124, 154, 130, 0.15);
+    color: var(--sage-green);
+}
+
+.step-frequency-badge.weekly {
+    background: rgba(255, 213, 79, 0.2);
+    color: #B8860B;
+}
+
+.step-frequency-badge.one-off {
+    background: rgba(144, 164, 174, 0.15);
+    color: var(--text-secondary);
+}
+
+.step-due-date {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+/* step action buttons */
+.goal-step-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+    margin-left: 8px;
+}
+
+.step-edit-btn,
+.step-delete-btn {
+    width: 30px;
+    height: 30px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+    transition: all 0.2s;
+    padding: 0;
+}
+
+.step-edit-btn:hover {
+    background: rgba(124, 154, 130, 0.1);
+    color: var(--sage-green);
+}
+
+.step-delete-btn:hover {
+    background: rgba(244, 165, 168, 0.15);
+    color: #D32F2F;
+}
+
+.step-delete-form {
+    margin: 0;
+    padding: 0;
+}
+
+/* edit form row */
+.goal-step-edit-row {
+    list-style: none;
+    padding: 12px 0;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+}
+
+.goal-step-edit-form {
+    margin: 0;
+}
+
+.step-edit-fields {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.step-edit-input {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    border-radius: var(--radius-md);
+    font-size: 0.9rem;
+    font-family: inherit;
+    background: var(--cream, #FFFAF5);
+    color: var(--text-primary);
+    box-sizing: border-box;
+}
+
+.step-edit-input:focus {
+    outline: none;
+    border-color: var(--sage-green);
+    box-shadow: 0 0 0 2px rgba(124, 154, 130, 0.15);
+}
+
+.step-edit-options {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.step-edit-select,
+.step-edit-date {
+    padding: 6px 10px;
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    border-radius: var(--radius-md);
+    font-size: 0.8rem;
+    font-family: inherit;
+    background: white;
+    color: var(--text-primary);
+}
+
+.step-save-btn {
+    padding: 6px 16px;
+    background: var(--sage-green);
+    color: white;
+    border: none;
+    border-radius: var(--radius-md);
+    font-size: 0.8rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.step-save-btn:hover {
+    background: #6B8A72;
+}
+
+.step-cancel-btn {
+    padding: 6px 16px;
+    background: transparent;
+    color: var(--text-muted);
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    border-radius: var(--radius-md);
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.step-cancel-btn:hover {
+    background: rgba(0, 0, 0, 0.03);
+}
+
+/* empty state */
+.goal-steps-empty {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    font-style: italic;
+    padding: 12px 0;
+    margin: 0 0 16px 0;
+}
+
+/* add step form */
+.goal-step-add {
+    padding-top: 16px;
+    border-top: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.goal-step-add-form {
+    margin: 0;
+}
+
+.step-add-row {
+    margin-bottom: 8px;
+}
+
+.step-add-input {
+    width: 100%;
+    padding: 10px 14px;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    border-radius: var(--radius-md);
+    font-size: 0.9rem;
+    font-family: inherit;
+    background: var(--cream, #FFFAF5);
+    color: var(--text-primary);
+    box-sizing: border-box;
+    transition: border-color 0.2s;
+}
+
+.step-add-input:focus {
+    outline: none;
+    border-color: var(--sage-green);
+    box-shadow: 0 0 0 2px rgba(124, 154, 130, 0.15);
+}
+
+.step-add-input::placeholder {
+    color: var(--text-muted);
+}
+
+.step-add-options {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.step-add-select,
+.step-add-date {
+    padding: 8px 10px;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    border-radius: var(--radius-md);
+    font-size: 0.85rem;
+    font-family: inherit;
+    background: white;
+    color: var(--text-primary);
+}
+
+.step-add-select:focus,
+.step-add-date:focus {
+    outline: none;
+    border-color: var(--sage-green);
+}
+
+.btn-calm-sm {
+    padding: 8px 20px;
+    font-size: 0.85rem;
+}
+
+/* mobile responsive for goal steps */
+@media (max-width: 768px) {
+    .goal-step-item {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .goal-step-actions {
+        margin-left: auto;
+    }
+
+    .step-add-options {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .step-add-options .btn-calm-sm {
+        width: 100%;
+        text-align: center;
+    }
+
+    .step-edit-options {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .step-edit-options .step-save-btn,
+    .step-edit-options .step-cancel-btn {
+        width: 100%;
+        text-align: center;
+    }
+}
+
+/* ===========================================
+   SOURCE BADGES - tag items by where they came from
+   =========================================== */
+
+.source-badge {
+    font-size: 0.65rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    padding: 2px 8px;
+    border-radius: var(--radius-pill);
+    margin-left: 6px;
+    display: inline-block;
+    vertical-align: middle;
+}
+
+.source-badge.goal {
+    background: rgba(139, 195, 148, 0.2);
+    color: var(--sage-green);
+}
+
+.source-badge.manual {
+    background: var(--bg-secondary);
+    color: var(--text-muted);
+}
+
+.source-badge.journal {
+    background: rgba(129, 178, 210, 0.2);
+    color: #5a9bbf;
+}
+
+.source-badge.habit {
+    background: rgba(139, 195, 148, 0.15);
+    color: var(--sage-green);
+}
+
+.source-badge.suggestion {
+    background: var(--bg-secondary);
+    color: var(--text-muted);
+}
+
+.source-badge.due {
+    background: var(--bg-secondary);
+    color: var(--text-muted);
+}
+
+.source-badge.overdue {
+    background: rgba(255, 112, 67, 0.15);
+    color: #e65100;
+}
+
+.source-badge.frequency-daily {
+    background: rgba(139, 195, 148, 0.15);
+    color: var(--sage-green);
+}
+
+.source-badge.frequency-weekly {
+    background: rgba(255, 213, 79, 0.2);
+    color: #f9a825;
+}
+
+.source-badge.frequency-one-off {
+    background: var(--bg-secondary);
+    color: var(--text-muted);
+}
+
+/* day-of-week badge for weekly steps */
+.source-badge.day-badge {
+    background: rgba(255, 213, 79, 0.15);
+    color: #B8860B;
+}
+
+/* shows which day the step belongs to on the goals page */
+.step-day-badge {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 2px 8px;
+    border-radius: 10px;
+    background: rgba(255, 213, 79, 0.15);
+    color: #B8860B;
+}
+
+/* tells the user that daily/weekly steps reset automatically */
+.step-recurring-label {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    font-style: italic;
+}
+
+/* gentle overdue message for one-off steps past their due date */
+.overdue-message {
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+    margin-left: 40px;
+    margin-top: 4px;
+    padding: 6px 12px;
+    background: rgba(255, 112, 67, 0.06);
+    border-radius: var(--radius-md);
+    border-left: 3px solid rgba(255, 112, 67, 0.3);
+}
+
+.overdue-message a {
+    color: var(--sage-green);
+    text-decoration: underline;
+}
+
+/* completed recurring step on today page */
+.step-done-today {
+    opacity: 0.7;
+}
+
+/* small context line under a goal step showing which intention it belongs to */
+.step-goal-context {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    font-style: italic;
+    margin-left: 40px;
+    margin-top: 2px;
+    display: block;
+}
+
+/* ===========================================
+   HIDE HABIT BUTTON - dismiss suggested habits
+   =========================================== */
+
+.hide-habit-form {
+    margin-left: auto;
+    flex-shrink: 0;
+}
+
+.hide-habit-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-muted);
+    padding: 6px;
+    border-radius: var(--radius-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.2s, background 0.2s;
+    opacity: 0.5;
+}
+
+.hide-habit-btn:hover {
+    color: #e65100;
+    background: rgba(255, 112, 67, 0.1);
+    opacity: 1;
+}
+
+/* ===========================================
+   WEEKLY PLANNER - day-grouped view
+   =========================================== */
+
+.week-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.week-day-card {
+    background: var(--card-bg);
+    border-radius: var(--radius-lg);
+    padding: 20px 24px;
+    border: 1px solid rgba(0, 0, 0, 0.04);
+    transition: box-shadow 0.2s;
+}
+
+.week-day-card:hover {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+}
+
+.week-day-today {
+    border-left: 3px solid var(--sage-green);
+    background: rgba(139, 195, 148, 0.04);
+}
+
+.week-day-past {
+    opacity: 0.7;
+}
+
+/* day header */
+.week-day-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.week-day-title {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+}
+
+.week-day-name {
+    font-size: 1rem;
+    font-weight: 500;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.week-day-date {
+    font-size: 0.82rem;
+    color: var(--text-muted);
+}
+
+.week-today-badge {
+    font-size: 0.7rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    background: var(--sage-green);
+    color: white;
+    padding: 2px 10px;
+    border-radius: var(--radius-pill);
+}
+
+/* habit completion bar */
+.week-habits-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.week-habits-bar-track {
+    flex: 1;
+    height: 6px;
+    background: var(--bg-secondary);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.week-habits-bar-fill {
+    height: 100%;
+    background: var(--sage-green);
+    border-radius: 3px;
+    transition: width 0.3s;
+    min-width: 0;
+}
+
+.week-habits-count {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+/* sections within a day card */
+.week-section {
+    margin-bottom: 8px;
+}
+
+.week-section:last-child {
+    margin-bottom: 0;
+}
+
+/* journal entries with emotion dot */
+.week-journal-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 4px 0;
+}
+
+.week-emotion-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    margin-top: 5px;
+}
+
+.week-journal-snippet {
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+    font-style: italic;
+    line-height: 1.4;
+}
+
+/* task rows - goal steps and todos */
+.week-task-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 5px 0;
+}
+
+.week-task-form {
+    flex-shrink: 0;
+}
+
+.week-task-check {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: 2px solid rgba(0, 0, 0, 0.15);
+    background: none;
+    cursor: pointer;
+    padding: 0;
+    transition: border-color 0.2s, background 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.week-task-check:hover {
+    border-color: var(--sage-green);
+    background: rgba(139, 195, 148, 0.1);
+}
+
+.week-task-check-done {
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--sage-green);
+    font-size: 0.85rem;
+    flex-shrink: 0;
+}
+
+.week-task-content {
+    flex: 1;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+}
+
+.week-task-text {
+    font-size: 0.88rem;
+    color: var(--text-primary);
+    line-height: 1.4;
+}
+
+.week-task-text-struck {
+    text-decoration: line-through;
+    color: var(--text-muted);
+}
+
+.week-task-done {
+    opacity: 0.6;
+}
+
+.week-task-tags {
+    display: flex;
+    gap: 4px;
+}
+
+/* empty day state */
+.week-day-empty {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    font-style: italic;
+    margin: 4px 0 0;
+}
+
+/* mobile day-at-a-time navigation */
+.week-mobile-nav {
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 0;
+    margin-bottom: 8px;
+}
+
+.week-nav-btn {
+    background: var(--card-bg);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: var(--radius-md);
+    padding: 10px 14px;
+    cursor: pointer;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+    min-width: 44px;
+    min-height: 44px;
+}
+
+.week-nav-btn:hover {
+    background: var(--bg-secondary);
+}
+
+.week-nav-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+.week-nav-label {
+    font-size: 1rem;
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+/* mobile responsive */
+@media (max-width: 768px) {
+    .week-mobile-nav {
+        display: flex;
+    }
+
+    /* when JS has set up mobile mode, hide non-active cards */
+    .week-grid.mobile-ready .week-day-card {
+        display: none;
+    }
+
+    .week-grid.mobile-ready .week-day-card.mobile-active {
+        display: block;
+    }
+
+    .week-day-card {
+        padding: 16px;
+    }
+
+    .week-day-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+    }
+
+    .week-today-badge {
+        align-self: flex-start;
+    }
+
+    .week-task-content {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+}
+
+
+/* ============================================
+   Monthly Calendar
+   ============================================ */
+
+/* prev/next month navigation */
+.month-nav {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+}
+
+.month-nav-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: var(--radius-md);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    background: var(--bg-card);
+    color: var(--text-primary);
+    text-decoration: none;
+    transition: background 0.2s, border-color 0.2s;
+    min-width: 44px;
+    min-height: 44px;
+}
+
+.month-nav-btn:hover {
+    background: var(--bg-secondary);
+    border-color: rgba(0, 0, 0, 0.12);
+}
+
+.month-nav-title {
+    font-family: 'Lora', Georgia, serif;
+    font-size: 1.15rem;
+    font-weight: 500;
+    color: var(--text-primary);
+    min-width: 160px;
+    text-align: center;
+}
+
+.month-today-link {
+    font-size: 0.82rem;
+    color: var(--sage-green-dark);
+    text-decoration: none;
+    border-bottom: 1px solid transparent;
+    transition: border-color 0.2s;
+}
+
+.month-today-link:hover {
+    border-bottom-color: var(--sage-green-dark);
+}
+
+/* calendar grid */
+.month-calendar {
+    background: var(--bg-card);
+    border-radius: var(--radius-lg);
+    border: 1px solid rgba(0, 0, 0, 0.04);
+    overflow: hidden;
+}
+
+/* day name header row */
+.month-header-row {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    background: var(--bg-secondary);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.month-header-cell {
+    text-align: center;
+    padding: 10px 4px;
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* a single week row */
+.month-row {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+}
+
+.month-row:last-child {
+    border-bottom: none;
+}
+
+/* individual day cell */
+.month-cell {
+    min-height: 80px;
+    padding: 8px;
+    border-right: 1px solid rgba(0, 0, 0, 0.04);
+    position: relative;
+    transition: background 0.15s;
+}
+
+.month-cell:last-child {
+    border-right: none;
+}
+
+/* clickable days with data */
+.month-cell-has-data {
+    cursor: pointer;
+}
+
+.month-cell-has-data:hover {
+    background: rgba(139, 195, 148, 0.06);
+}
+
+/* today highlight */
+.month-cell-today {
+    background: rgba(139, 195, 148, 0.08);
+}
+
+.month-cell-today .month-day-num {
+    background: var(--sage-green);
+    color: white;
+    border-radius: 50%;
+    width: 26px;
+    height: 26px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 500;
+}
+
+/* past days slightly faded */
+.month-cell-past {
+    opacity: 0.65;
+}
+
+/* selected day when detail is open */
+.month-cell-selected {
+    background: rgba(139, 195, 148, 0.12);
+    box-shadow: inset 0 0 0 2px var(--sage-green);
+}
+
+/* empty cell (padding for days outside this month) */
+.month-cell-empty {
+    background: var(--bg-secondary);
+    opacity: 0.3;
+    min-height: 80px;
+}
+
+/* day number */
+.month-day-num {
+    display: block;
+    font-size: 0.85rem;
+    font-weight: 400;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+}
+
+/* indicator dots container */
+.month-indicators {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3px;
+    align-items: center;
+}
+
+/* small coloured dot for emotions */
+.month-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+/* overflow indicator when more than 3 emotion dots */
+.month-dot-extra {
+    font-size: 0.6rem;
+    color: var(--text-muted);
+    line-height: 1;
+}
+
+/* task and habit indicators */
+.month-indicator {
+    font-size: 0.6rem;
+    line-height: 1;
+    flex-shrink: 0;
+}
+
+.month-indicator-done {
+    color: var(--sage-green);
+    font-size: 0.7rem;
+}
+
+.month-indicator-pending {
+    background: var(--bg-secondary);
+    color: var(--text-muted);
+    font-size: 0.55rem;
+    padding: 1px 4px;
+    border-radius: var(--radius-pill);
+    font-weight: 500;
+}
+
+.month-indicator-habits-full {
+    color: var(--sage-green);
+    font-size: 0.55rem;
+}
+
+.month-indicator-habits-partial {
+    color: var(--text-muted);
+    font-size: 0.55rem;
+}
+
+/* day detail panel that appears below the calendar */
+.month-detail-panel {
+    background: var(--bg-card);
+    border-radius: var(--radius-lg);
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    padding: 24px;
+    margin-top: 16px;
+    animation: monthDetailFadeIn 0.2s ease;
+}
+
+@keyframes monthDetailFadeIn {
+    from { opacity: 0; transform: translateY(-8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.month-detail-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.month-detail-title {
+    font-size: 1.1rem;
+    font-weight: 500;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.month-detail-close {
+    background: none;
+    border: none;
+    font-size: 1.4rem;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: var(--radius-sm);
+    transition: color 0.2s, background 0.2s;
+    line-height: 1;
+    min-width: 44px;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.month-detail-close:hover {
+    color: var(--text-primary);
+    background: var(--bg-secondary);
+}
+
+/* sections inside the detail panel */
+.month-detail-section {
+    margin-bottom: 16px;
+}
+
+.month-detail-section:last-child {
+    margin-bottom: 0;
+}
+
+.month-detail-label {
+    font-size: 0.78rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-muted);
+    margin: 0 0 8px;
+}
+
+/* hidden data divs - never shown directly */
+.month-day-data {
+    display: none;
+}
+
+/* mobile responsive */
+@media (max-width: 768px) {
+    .month-cell {
+        min-height: 52px;
+        padding: 4px;
+    }
+
+    .month-day-num {
+        font-size: 0.75rem;
+    }
+
+    .month-cell-today .month-day-num {
+        width: 22px;
+        height: 22px;
+        font-size: 0.7rem;
+    }
+
+    .month-dot {
+        width: 6px;
+        height: 6px;
+    }
+
+    .month-dot-extra {
+        display: none;
+    }
+
+    .month-indicator-pending {
+        font-size: 0.5rem;
+        padding: 0 3px;
+    }
+
+    .month-header-cell {
+        font-size: 0.65rem;
+        padding: 8px 2px;
+    }
+
+    .month-nav-title {
+        font-size: 1rem;
+        min-width: 140px;
+    }
+
+    .month-detail-panel {
+        padding: 16px;
+    }
+
+    .month-cell-empty {
+        min-height: 52px;
+    }
+}

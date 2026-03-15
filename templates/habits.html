@@ -27,7 +27,9 @@
             <li><a href="{{ url_for('today') }}">Today</a></li>
             <li><a href="{{ url_for('journal') }}">Reflect</a></li>
             <li><a href="{{ url_for('habits') }}" class="active">Tiny Steps</a></li>
+            <li><a href="{{ url_for('goals_page') }}">Intentions</a></li>
             <li><a href="{{ url_for('week') }}">Week</a></li>
+            <li><a href="{{ url_for('month') }}">Month</a></li>
             <li><a href="{{ url_for('analytics') }}">Patterns</a></li>
             <li><a href="{{ url_for('logout') }}" class="logout-link">Log out</a></li>
         </ul>
@@ -80,6 +82,16 @@
                         <span class="habit-goal-context">Supports: {{ h["goal_text"] }}</span>
                         {% endif %}
                     </label>
+                    {% if h["is_sample"] %}
+                    <form method="post" action="{{ url_for('hide_habit', habit_id=h['id']) }}" class="hide-habit-form">
+                        <button type="submit" class="hide-habit-btn" title="Hide this suggestion">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="18" y1="6" x2="6" y2="18"></line>
+                                <line x1="6" y1="6" x2="18" y2="18"></line>
+                            </svg>
+                        </button>
+                    </form>
+                    {% endif %}
                 </li>
                 {% endfor %}
             </ul>

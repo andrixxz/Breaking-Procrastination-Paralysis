@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>Weekly Overview – Breaking Procrastination Paralysis</title>
+    <title>Weekly Planner - Breaking Procrastination Paralysis</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -21,7 +21,9 @@
             <li><a href="{{ url_for('today') }}">Today</a></li>
             <li><a href="{{ url_for('journal') }}">Reflect</a></li>
             <li><a href="{{ url_for('habits') }}">Tiny Steps</a></li>
+            <li><a href="{{ url_for('goals_page') }}">Intentions</a></li>
             <li><a href="{{ url_for('week') }}" class="active">Week</a></li>
+            <li><a href="{{ url_for('month') }}">Month</a></li>
             <li><a href="{{ url_for('analytics') }}">Patterns</a></li>
             <li><a href="{{ url_for('logout') }}" class="logout-link">Log out</a></li>
         </ul>
@@ -30,68 +32,173 @@
     <main class="page-content stagger-children">
 
         <div class="section-header fade-in-up">
-            <h1 class="section-title">Weekly Overview</h1>
+            <h1 class="section-title">Your Week</h1>
             <p class="section-subtitle">
-                A calm look at what is ahead this week and how your habits are going.
+                A calm look at what is ahead. No pressure, just awareness.
             </p>
         </div>
 
-        <!-- weekly stats -->
-        <div class="patterns-grid">
+        <!-- weekly summary stats -->
+        <div class="patterns-grid fade-in-up">
             <div class="card pattern-card">
-                <p class="pattern-value">{{ week_todos | length }}</p>
-                <p class="pattern-label">Tasks due this week</p>
+                <p class="pattern-value">{{ total_journal_entries }}</p>
+                <p class="pattern-label">Reflections this week</p>
             </div>
             <div class="card pattern-card">
-                <p class="pattern-value">{{ journal_count }}</p>
-                <p class="pattern-label">Journal entries this week</p>
+                <p class="pattern-value">{{ total_habits_done }}</p>
+                <p class="pattern-label">Habits completed</p>
             </div>
+            {% if total_habits > 0 %}
+            <div class="card pattern-card">
+                <p class="pattern-value">{{ total_habits }}</p>
+                <p class="pattern-label">Active habits</p>
+            </div>
+            {% endif %}
         </div>
 
-        <!-- tasks due this week -->
-        <div class="card" style="padding: 24px;">
-            <h2>Tasks Due This Week</h2>
-            <p class="section-subtitle" style="margin-bottom: 16px;">
-                What needs attention in the next 7 days.
-            </p>
+        <!-- mobile day navigation - only visible on small screens -->
+        <div class="week-mobile-nav" id="weekMobileNav">
+            <button type="button" id="weekPrevBtn" class="week-nav-btn" onclick="changeDay(-1)">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+            </button>
+            <span class="week-nav-label" id="mobileDayLabel"></span>
+            <button type="button" id="weekNextBtn" class="week-nav-btn" onclick="changeDay(1)">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+            </button>
+        </div>
 
-            {% if week_todos %}
-            <ul class="habit-list">
-                {% for todo in week_todos %}
-                <li class="habit-item" style="justify-content: space-between;">
-                    <div style="display: flex; align-items: center; gap: 12px; flex: 1;">
-                        {% if todo['is_done'] %}
-                            <span style="color: var(--sage-green); font-size: 1.1rem;">&#10003;</span>
-                            <span class="habit-label" style="text-decoration: line-through; color: var(--text-muted);">{{ todo['text'] }}</span>
+        <!-- day cards -->
+        <div class="week-grid" id="weekGrid">
+            {% for day in week_days %}
+            <div class="week-day-card {{ 'week-day-today' if day.is_today }} {{ 'week-day-past' if day.is_past }}"
+                 data-day-index="{{ loop.index0 }}"
+                 data-day-name="{{ day.name }}"
+                 data-day-date="{{ day.date_display }}">
+
+                <!-- day header -->
+                <div class="week-day-header">
+                    <div class="week-day-title">
+                        <h3 class="week-day-name">{{ day.name }}</h3>
+                        <span class="week-day-date">{{ day.date_display }}</span>
+                    </div>
+                    {% if day.is_today %}
+                    <span class="week-today-badge">Today</span>
+                    {% endif %}
+                </div>
+
+                <!-- habit completion for this day -->
+                {% if day.habits_total > 0 %}
+                <div class="week-habits-row">
+                    <div class="week-habits-bar-track">
+                        <div class="week-habits-bar-fill" style="width: {{ (day.habits_done / day.habits_total * 100) | round }}%;"></div>
+                    </div>
+                    <span class="week-habits-count">{{ day.habits_done }}/{{ day.habits_total }}</span>
+                </div>
+                {% endif %}
+
+                <!-- journal entries with emotion colour dots -->
+                {% if day.journals %}
+                <div class="week-section">
+                    {% for entry in day.journals %}
+                    <div class="week-journal-row">
+                        <span class="week-emotion-dot" style="background: var(--emotion-{{ entry.predicted_emotion }}, var(--text-muted));" title="{{ entry.predicted_emotion or 'unknown' }}"></span>
+                        <span class="week-journal-snippet">{{ entry.entry_text[:80] }}{% if entry.entry_text|length > 80 %}...{% endif %}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                <!-- goal steps for this day -->
+                {% if day.goal_steps %}
+                <div class="week-section">
+                    {% for step in day.goal_steps %}
+                    <div class="week-task-row {{ 'week-task-done' if step.get('is_completed_today') }}">
+                        {% if step.get('is_completed_today') %}
+                        <form method="post" action="{{ url_for('toggle_goal_step', step_id=step['id']) }}" class="week-task-form">
+                            <input type="hidden" name="redirect" value="week">
+                            <button type="submit" class="week-task-check-done" title="Undo" style="cursor: pointer; border: none; background: none;">&#10003;</button>
+                        </form>
+                        <div class="week-task-content">
+                            <span class="week-task-text week-task-text-struck">{{ step['step_text'] }}</span>
+                            <div class="week-task-tags">
+                                <span class="source-badge goal">intention</span>
+                                <span class="source-badge frequency-{{ step['frequency'] }}">{{ step['frequency'] }}</span>
+                                {% if step['frequency'] == 'weekly' and step.get('day_of_week') is not none %}
+                                <span class="source-badge day-badge">{{ ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][step['day_of_week']] }}</span>
+                                {% endif %}
+                            </div>
+                        </div>
                         {% else %}
-                            <form method="post" action="{{ url_for('toggle_todo', todo_id=todo['id']) }}" style="display: flex; align-items: center; gap: 12px;">
-                                <input type="hidden" name="redirect" value="week">
-                                <button type="submit" class="habit-checkbox" style="border: none; cursor: pointer;"></button>
-                                <span class="habit-label">{{ todo['text'] }}</span>
-                            </form>
+                        <form method="post" action="{{ url_for('toggle_goal_step', step_id=step['id']) }}" class="week-task-form">
+                            <input type="hidden" name="redirect" value="week">
+                            <button type="submit" class="week-task-check" title="Mark done"></button>
+                        </form>
+                        <div class="week-task-content">
+                            <span class="week-task-text">{{ step['step_text'] }}</span>
+                            <div class="week-task-tags">
+                                <span class="source-badge goal">intention</span>
+                                <span class="source-badge frequency-{{ step['frequency'] }}">{{ step['frequency'] }}</span>
+                                {% if step['frequency'] == 'weekly' and step.get('day_of_week') is not none %}
+                                <span class="source-badge day-badge">{{ ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][step['day_of_week']] }}</span>
+                                {% endif %}
+                            </div>
+                        </div>
                         {% endif %}
                     </div>
-                    {% if todo['due_date'] %}
-                    <span class="habit-tag" style="{% if todo['due_date'] == today_str %}background: var(--blush-pink-light);{% endif %}">
-                        {{ todo['due_date'] }}
-                    </span>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                <!-- todos for this day -->
+                {% if day.todos %}
+                <div class="week-section">
+                    {% for todo in day.todos %}
+                    <div class="week-task-row {{ 'week-task-done' if todo['is_done'] }}">
+                        {% if todo['is_done'] %}
+                        <span class="week-task-check-done">&#10003;</span>
+                        <div class="week-task-content">
+                            <span class="week-task-text week-task-text-struck">{{ todo['text'] }}</span>
+                        </div>
+                        {% else %}
+                        <form method="post" action="{{ url_for('toggle_todo', todo_id=todo['id']) }}" class="week-task-form">
+                            <input type="hidden" name="redirect" value="week">
+                            <button type="submit" class="week-task-check" title="Mark done"></button>
+                        </form>
+                        <div class="week-task-content">
+                            <span class="week-task-text">{{ todo['text'] }}</span>
+                            {% if todo['source'] == 'journal' %}
+                            <span class="source-badge journal">from journal</span>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                <!-- nothing planned for this day -->
+                {% if not day.todos and not day.goal_steps and not day.journals and day.habits_done == 0 %}
+                <p class="week-day-empty">
+                    {% if day.is_past %}
+                    Quiet day.
+                    {% elif day.is_today %}
+                    Nothing planned yet. <a href="{{ url_for('today') }}" class="btn-text">Plan your day</a>
+                    {% else %}
+                    Nothing planned yet.
                     {% endif %}
-                </li>
-                {% endfor %}
-            </ul>
-            {% else %}
-            <p class="empty-state" style="padding: 16px 0;">
-                No dated tasks for the coming week. You can add dates to tasks on the Today page.
-            </p>
-            {% endif %}
+                </p>
+                {% endif %}
+
+            </div>
+            {% endfor %}
         </div>
 
         <!-- undated tasks -->
         {% if undated_todos %}
-        <div class="card" style="padding: 24px;">
-            <h2>Undated Tasks</h2>
+        <div class="card fade-in-up" style="padding: 24px;">
+            <h2>Unscheduled</h2>
             <p class="section-subtitle" style="margin-bottom: 16px;">
-                Tasks without a deadline. Do them whenever feels right.
+                Tasks without a date. Do them whenever feels right.
             </p>
             <ul class="habit-list">
                 {% for todo in undated_todos %}
@@ -107,35 +214,6 @@
         </div>
         {% endif %}
 
-        <!-- habit summary -->
-        <div class="card" style="padding: 24px;">
-            <h2>Habit Summary: Last 7 Days</h2>
-            <p class="section-subtitle" style="margin-bottom: 16px;">
-                How often you showed up for each habit this week.
-            </p>
-
-            {% if habit_summary %}
-            <ul class="emotion-bar-list">
-                {% for h in habit_summary %}
-                <li class="emotion-bar-item">
-                    <span class="emotion-bar-name" style="width: auto; min-width: 140px;">{{ h['name'][:30] }}</span>
-                    <div class="emotion-bar-track">
-                        <div
-                            class="emotion-bar-fill calm"
-                            style="width: {{ (h['completions'] / 7 * 100) | round }}%;"
-                        ></div>
-                    </div>
-                    <span class="emotion-bar-count">{{ h['completions'] }}/7</span>
-                </li>
-                {% endfor %}
-            </ul>
-            {% else %}
-            <p class="empty-state" style="padding: 16px 0;">
-                No habits tracked yet. Visit the Today page to get started.
-            </p>
-            {% endif %}
-        </div>
-
         <div style="margin-top: 24px;">
             <a href="{{ url_for('today') }}" class="btn-text">Back to Today</a>
         </div>
@@ -147,11 +225,11 @@
 <div class="cursor-glow" id="cursorGlow"></div>
 <script>
 (function() {
-    const glow = document.getElementById('cursorGlow');
+    var glow = document.getElementById('cursorGlow');
     if (!glow || window.innerWidth < 768) return;
 
-    let mouseX = -300, mouseY = -300;
-    let glowX = -300, glowY = -300;
+    var mouseX = -300, mouseY = -300;
+    var glowX = -300, glowY = -300;
 
     document.addEventListener('mousemove', function(e) {
         mouseX = e.clientX;
@@ -166,6 +244,47 @@
         requestAnimationFrame(animate);
     }
     animate();
+})();
+
+// mobile day-at-a-time navigation
+(function() {
+    var currentDay = {{ today_index }};
+    var grid = document.getElementById('weekGrid');
+    var label = document.getElementById('mobileDayLabel');
+    var prevBtn = document.getElementById('weekPrevBtn');
+    var nextBtn = document.getElementById('weekNextBtn');
+    var cards = grid ? grid.querySelectorAll('.week-day-card') : [];
+
+    function updateMobile() {
+        // show only the active card
+        for (var i = 0; i < cards.length; i++) {
+            if (i === currentDay) {
+                cards[i].classList.add('mobile-active');
+            } else {
+                cards[i].classList.remove('mobile-active');
+            }
+        }
+        // update the label
+        if (label && cards[currentDay]) {
+            label.textContent = cards[currentDay].getAttribute('data-day-name') +
+                ' ' + cards[currentDay].getAttribute('data-day-date');
+        }
+        // disable buttons at the edges
+        if (prevBtn) prevBtn.disabled = (currentDay === 0);
+        if (nextBtn) nextBtn.disabled = (currentDay === cards.length - 1);
+    }
+
+    // only activate mobile mode on small screens
+    if (window.innerWidth < 768 && grid) {
+        grid.classList.add('mobile-ready');
+        updateMobile();
+    }
+
+    // expose changeDay to the buttons
+    window.changeDay = function(offset) {
+        currentDay = Math.max(0, Math.min(cards.length - 1, currentDay + offset));
+        updateMobile();
+    };
 })();
 </script>
 </body>
