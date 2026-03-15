@@ -3559,6 +3559,18 @@ def analytics():
 
 
 # ====================================
+# PSYCHOLOGY EDUCATION
+# ====================================
+
+@app.route("/learn")
+@login_required
+@onboarding_check
+def learn():
+    """show the 'how this works' page - psychology behind each feature"""
+    return render_template("learn.html")
+
+
+# ====================================
 # GOAL BREAKDOWN ROUTES
 # ====================================
 

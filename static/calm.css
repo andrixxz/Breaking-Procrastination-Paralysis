@@ -2523,8 +2523,8 @@ input::placeholder {
     background: var(--sage-green);
 }
 
-/* --- Psychology Explainers --- */
-/* Expandable "Why this works" sections beside key features */
+/* --- Psychology Explainers (refined in Task 4.3) --- */
+/* info icon + expandable "Why this works" beside key features */
 .psych-explainer {
     margin-top: 10px;
 }
@@ -2536,10 +2536,31 @@ input::placeholder {
     list-style: none;
     display: inline-flex;
     align-items: center;
-    gap: 4px;
+    gap: 6px;
     opacity: 0.75;
     transition: opacity 0.2s;
     user-select: none;
+    padding: 3px 8px 3px 4px;
+    border-radius: var(--radius-sm, 6px);
+}
+
+/* small (i) circle before the text */
+.psych-explainer summary::before {
+    content: "i";
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 1.5px solid var(--sage-green-dark, #5a7a5a);
+    font-size: 0.65rem;
+    font-style: italic;
+    font-family: 'Lora', Georgia, serif;
+    line-height: 1;
+    flex-shrink: 0;
+    opacity: 0.85;
+    transition: opacity 0.2s, background 0.2s, color 0.2s;
 }
 
 .psych-explainer summary::-webkit-details-marker {
@@ -2552,6 +2573,18 @@ input::placeholder {
 
 .psych-explainer summary:hover {
     opacity: 1;
+    background: rgba(127, 163, 114, 0.06);
+}
+
+/* when open, fill in the icon */
+.psych-explainer[open] summary::before {
+    background: var(--sage-green-dark, #5a7a5a);
+    color: #fff;
+    opacity: 1;
+}
+
+.psych-explainer[open] summary {
+    opacity: 1;
 }
 
 .psych-explainer p {
@@ -2563,6 +2596,12 @@ input::placeholder {
     background: rgba(127, 163, 114, 0.06);
     border-left: 2px solid rgba(127, 163, 114, 0.35);
     border-radius: 0 var(--radius-sm, 6px) var(--radius-sm, 6px) 0;
+    animation: explainerFadeIn 0.25s ease;
+}
+
+@keyframes explainerFadeIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to   { opacity: 1; transform: translateY(0); }
 }
 
 
@@ -3888,5 +3927,419 @@ input::placeholder {
 
     .month-cell-empty {
         min-height: 52px;
+    }
+}
+
+
+/* ============================================
+   Learn Page - Psychology Education
+   ============================================ */
+
+/* page header */
+.learn-header {
+    text-align: center;
+    margin-bottom: var(--space-xl, 40px);
+}
+
+.learn-title {
+    font-family: 'Lora', Georgia, serif;
+    font-size: 1.8rem;
+    font-weight: 500;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+}
+
+.learn-subtitle {
+    font-size: 0.95rem;
+    color: var(--text-secondary);
+    line-height: 1.6;
+    max-width: 560px;
+    margin: 0 auto;
+}
+
+/* feature-to-research map */
+.learn-map {
+    background: var(--bg-card);
+    border-radius: var(--radius-lg, 16px);
+    padding: 24px 28px;
+    margin-bottom: var(--space-xl, 40px);
+    box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+}
+
+.learn-map-title {
+    font-family: 'Lora', Georgia, serif;
+    font-size: 1.05rem;
+    font-weight: 500;
+    color: var(--text-primary);
+    margin-bottom: 16px;
+    text-align: center;
+}
+
+/* map intro text */
+.learn-map-intro {
+    text-align: center;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-bottom: 20px;
+}
+
+/* stage flow indicator - shows Awareness > Alignment > Action at top of map */
+.learn-map-flow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 24px;
+    padding: 12px 0;
+}
+
+.learn-map-flow-stage {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.learn-map-flow-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--sage-green);
+}
+
+.learn-map-flow-label {
+    font-size: 0.82rem;
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.learn-map-flow-connector {
+    width: 40px;
+    height: 1px;
+    background: var(--sage-green);
+    opacity: 0.4;
+    margin: 0 12px;
+}
+
+/* 3-column grouped layout for the feature map */
+.learn-map-groups {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 20px;
+}
+
+/* each stage group column */
+.learn-map-group {
+    display: flex;
+    flex-direction: column;
+}
+
+.learn-map-group-header {
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid rgba(127, 163, 114, 0.2);
+}
+
+.learn-map-group-label {
+    font-family: 'Lora', Georgia, serif;
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: var(--sage-green-dark);
+    margin: 0 0 4px 0;
+}
+
+.learn-map-group-desc {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    margin: 0;
+    line-height: 1.4;
+}
+
+.learn-map-group-items {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+/* each feature mapping - clickable button that jumps to the related card */
+.learn-map-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 10px 12px;
+    border-radius: var(--radius-sm, 6px);
+    background: var(--bg-secondary, #F5EDEF);
+    font-size: 0.85rem;
+    transition: background 0.2s, transform 0.15s, border-color 0.2s;
+    border: 1px solid transparent;
+    cursor: pointer;
+    text-align: left;
+    font-family: inherit;
+    width: 100%;
+}
+
+.learn-map-item:hover {
+    background: rgba(127, 163, 114, 0.1);
+    border-color: rgba(127, 163, 114, 0.2);
+    transform: translateY(-1px);
+}
+
+.learn-map-item:focus-visible {
+    outline: 2px solid var(--sage-green);
+    outline-offset: 2px;
+}
+
+/* top row of each map item - feature name, arrow, research basis */
+.learn-map-item-top {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.learn-map-feature {
+    font-weight: 500;
+    color: var(--sage-green-dark);
+    white-space: nowrap;
+}
+
+.learn-map-arrow {
+    color: var(--text-muted);
+    flex-shrink: 0;
+    font-size: 0.8rem;
+}
+
+.learn-map-research {
+    color: var(--text-secondary);
+    font-size: 0.78rem;
+}
+
+/* brief explanation under each feature mapping */
+.learn-map-explain {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    line-height: 1.4;
+    padding-top: 2px;
+}
+
+/* expandable cards */
+.learn-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: var(--space-lg, 32px);
+}
+
+.learn-card {
+    background: var(--bg-card);
+    border-radius: var(--radius-md, 12px);
+    box-shadow: 0 2px 10px rgba(0,0,0,0.03);
+    overflow: hidden;
+    transition: box-shadow 0.3s, transform 0.2s, border-color 0.3s;
+    border: 1px solid transparent;
+    scroll-margin-top: 20px;
+}
+
+.learn-card:hover {
+    box-shadow: 0 4px 18px rgba(0,0,0,0.06);
+}
+
+.learn-card-open {
+    border-color: rgba(127, 163, 114, 0.3);
+}
+
+/* highlight effect when a card is scrolled to from the visual map */
+.learn-card-highlight {
+    border-color: var(--sage-green) !important;
+    box-shadow: 0 0 0 3px rgba(127, 163, 114, 0.25) !important;
+}
+
+/* card toggle button - the clickable header */
+.learn-card-toggle {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 18px 22px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    text-align: left;
+    font-family: inherit;
+    transition: background 0.2s;
+    min-height: 44px;
+}
+
+.learn-card-toggle:hover {
+    background: rgba(127, 163, 114, 0.04);
+}
+
+.learn-card-number {
+    font-family: 'Lora', Georgia, serif;
+    font-size: 0.85rem;
+    color: var(--sage-green);
+    font-weight: 500;
+    flex-shrink: 0;
+    width: 28px;
+}
+
+.learn-card-title {
+    font-size: 0.98rem;
+    font-weight: 500;
+    color: var(--text-primary);
+    flex: 1;
+    margin: 0;
+    line-height: 1.4;
+}
+
+.learn-card-icon {
+    font-size: 1.3rem;
+    color: var(--sage-green);
+    flex-shrink: 0;
+    width: 28px;
+    text-align: center;
+    transition: transform 0.2s;
+    font-weight: 300;
+}
+
+/* card body - the expanded content */
+.learn-card-body {
+    padding: 0 22px 22px 64px;
+    animation: learnCardFadeIn 0.3s ease;
+}
+
+@keyframes learnCardFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-6px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.learn-card-body p {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    line-height: 1.7;
+    margin-bottom: 14px;
+}
+
+.learn-card-body p:last-child {
+    margin-bottom: 0;
+}
+
+/* the "this is why..." link sentence */
+.learn-card-link {
+    color: var(--sage-green-dark) !important;
+    font-weight: 500;
+    font-size: 0.88rem !important;
+    padding: 10px 14px;
+    background: rgba(127, 163, 114, 0.06);
+    border-left: 3px solid var(--sage-green);
+    border-radius: 0 var(--radius-sm, 6px) var(--radius-sm, 6px) 0;
+}
+
+/* citation at the bottom of each card */
+.learn-card-citation {
+    font-size: 0.78rem !important;
+    color: var(--text-muted) !important;
+    font-style: italic;
+    padding-top: 6px;
+    border-top: 1px solid rgba(0,0,0,0.05);
+}
+
+/* footer with back link */
+.learn-footer {
+    text-align: center;
+    padding: var(--space-md, 20px) 0 var(--space-lg, 32px);
+}
+
+.learn-back-link {
+    font-size: 0.9rem;
+    color: var(--sage-green-dark);
+    text-decoration: none;
+    padding: 10px 20px;
+    border-radius: var(--radius-md, 12px);
+    transition: background 0.2s, color 0.2s;
+}
+
+.learn-back-link:hover {
+    background: rgba(127, 163, 114, 0.08);
+    color: var(--sage-green);
+}
+
+/* mobile responsive */
+@media (max-width: 768px) {
+    .learn-title {
+        font-size: 1.4rem;
+    }
+
+    .learn-subtitle {
+        font-size: 0.88rem;
+    }
+
+    .learn-map {
+        padding: 16px 14px;
+    }
+
+    .learn-map-intro {
+        font-size: 0.8rem;
+        margin-bottom: 14px;
+    }
+
+    .learn-map-flow {
+        margin-bottom: 16px;
+    }
+
+    .learn-map-flow-connector {
+        width: 24px;
+        margin: 0 6px;
+    }
+
+    .learn-map-flow-label {
+        font-size: 0.75rem;
+    }
+
+    .learn-map-groups {
+        grid-template-columns: 1fr;
+        gap: 20px;
+    }
+
+    .learn-map-group-label {
+        font-size: 0.88rem;
+    }
+
+    .learn-map-feature {
+        font-size: 0.82rem;
+    }
+
+    .learn-map-research {
+        font-size: 0.75rem;
+    }
+
+    .learn-map-explain {
+        font-size: 0.72rem;
+    }
+
+    .learn-card-toggle {
+        padding: 14px 16px;
+        gap: 10px;
+    }
+
+    .learn-card-body {
+        padding: 0 16px 18px 16px;
+    }
+
+    .learn-card-title {
+        font-size: 0.9rem;
+    }
+
+    .learn-card-number {
+        width: 24px;
+        font-size: 0.8rem;
+    }
+
+    .learn-card-body p {
+        font-size: 0.85rem;
     }
 }
