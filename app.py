@@ -1,19 +1,59 @@
 from flask import Flask, render_template, request, redirect, url_for, session, flash
-import sqlite3
+from flask_wtf.csrf import CSRFProtect, CSRFError
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 import joblib
 import os
+import html as html_module
 import calendar as cal_module
+import bleach
 from datetime import datetime, date, timedelta
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
+from dotenv import load_dotenv
+
+# load .env so we can read DATABASE_URL
+load_dotenv()
+
+# figure out which database to use - postgres for production, sqlite for local dev
+DATABASE_URL = os.getenv('DATABASE_URL')
+USE_POSTGRES = DATABASE_URL is not None
+
+if USE_POSTGRES:
+    import psycopg2
+    import psycopg2.extras
+    print("Using PostgreSQL (Supabase)")
+else:
+    import sqlite3
+    print("Using SQLite (local dev)")
 
 # creates flask app instance
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
 
-# Session configuration - ensures sessions persist across requests
+# rate limiting - stops brute force attacks on login/signup and abuse of journal
+# uses the client's IP address to track how many requests they've made
+# if they go over the limit they get a 429 Too Many Requests error
+# registered BEFORE csrf so rate checks happen first - cheaper to reject early
+limiter = Limiter(
+    get_remote_address,
+    app=app,
+    default_limits=["60 per minute"],
+    storage_uri="memory://"
+)
+
+# csrf protection - every form gets a hidden token, rejects forged requests
+csrf = CSRFProtect(app)
+
+# secure session cookies - Layer 2 of our security stack
+# stops JS from reading the session cookie so XSS cant steal it
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+# only send cookie over HTTPS in production, allow HTTP for local dev
+# Render sets RENDER=true automatically so we know we're deployed
+app.config['SESSION_COOKIE_SECURE'] = os.environ.get('RENDER') is not None
+# stops the browser from sending our cookie with cross-site requests
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
-app.config['SESSION_COOKIE_SECURE'] = False  # Set to True in production with HTTPS
+# session lasts 7 days before the user has to log in again
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)
 
 # file paths
@@ -45,13 +85,97 @@ else:
 
 
 # database setup + connection
+#
+# all queries use %s placeholders (postgres style)
+# when running on sqlite, the wrapper swaps %s back to ? automatically
+# this way the code works with both databases without changing every query
 
-def get_db_connection():
-    # opens DB with rows returned as dictionary-like objects
-    conn = sqlite3.connect(DB_PATH, timeout=30)  # Increased timeout to 30 seconds
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode=WAL")  # Enable Write-Ahead Logging for better concurrency
-    return conn
+
+class SQLiteCursorWrapper:
+    """wraps sqlite3 cursor so we can write %s everywhere and it converts to ? for sqlite"""
+
+    def __init__(self, cursor):
+        self._cursor = cursor
+        self.lastrowid = None
+        self.description = cursor.description
+
+    def execute(self, query, params=None):
+        # swap postgres-style %s to sqlite-style ?
+        query = query.replace('%s', '?')
+        if params:
+            self._cursor.execute(query, params)
+        else:
+            self._cursor.execute(query)
+        self.lastrowid = self._cursor.lastrowid
+        self.description = self._cursor.description
+        return self
+
+    def fetchone(self):
+        return self._cursor.fetchone()
+
+    def fetchall(self):
+        return self._cursor.fetchall()
+
+
+class SQLiteConnectionWrapper:
+    """wraps sqlite3 connection so cursor() returns our custom cursor"""
+
+    def __init__(self, conn):
+        self._conn = conn
+
+    def cursor(self):
+        return SQLiteCursorWrapper(self._conn.cursor())
+
+    def commit(self):
+        self._conn.commit()
+
+    def close(self):
+        self._conn.close()
+
+
+def get_db_connection(rls_user_id=None):
+    """connects to postgres if DATABASE_URL is set, falls back to sqlite for local dev
+    rls_user_id lets you pass a user_id explicitly for RLS (used during signup
+    before the session is set up)"""
+    if USE_POSTGRES:
+        conn = psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
+
+        # switch to flask_app role so RLS actually gets enforced
+        # the default postgres role has BYPASSRLS which would skip all our policies
+        rls_cur = conn.cursor()
+        rls_cur.execute("SET ROLE flask_app;")
+
+        # tell postgres which user this connection is for
+        # RLS policies check this variable so users only see their own data
+        # if no user is set (like on login page), queries to RLS tables return nothing
+        uid = rls_user_id
+        if uid is None:
+            try:
+                uid = session.get('user_id')
+            except RuntimeError:
+                # not inside a flask request context (e.g. startup code)
+                uid = None
+
+        if uid is not None:
+            rls_cur.execute("SET app.current_user_id = %s", (str(uid),))
+
+        rls_cur.close()
+        return conn
+    else:
+        conn = sqlite3.connect(DB_PATH, timeout=30)
+        conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA journal_mode=WAL")
+        return SQLiteConnectionWrapper(conn)
+
+
+def insert_and_get_id(cur, query, params):
+    """run an INSERT and get the new row's id back - handles the difference between sqlite and postgres"""
+    if USE_POSTGRES:
+        cur.execute(query + " RETURNING id", params)
+        return cur.fetchone()['id']
+    else:
+        cur.execute(query, params)
+        return cur.lastrowid
 
 
 def init_db():
@@ -303,12 +427,13 @@ def migrate_db_for_onboarding():
 
 def initialize_user_data(user_id):
     # creates alignment state and sample habits for a new user
-    conn = get_db_connection()
+    # pass user_id directly because session['user_id'] isnt set yet at signup time
+    conn = get_db_connection(rls_user_id=user_id)
     cur = conn.cursor()
 
     cur.execute(
         "INSERT INTO alignment_state (user_id, alignment_score, emotional_streak, last_journal_date) "
-        "VALUES (?, 0, 0, NULL);",
+        "VALUES (%s, 0, 0, NULL);",
         (user_id,),
     )
 
@@ -320,7 +445,7 @@ def initialize_user_data(user_id):
     ]
     for name in sample_habits:
         cur.execute(
-            "INSERT INTO habits (user_id, name, is_sample, created_at) VALUES (?, ?, 1, ?)",
+            "INSERT INTO habits (user_id, name, is_sample, created_at) VALUES (%s, %s, 1, %s)",
             (user_id, name, now),
         )
 
@@ -351,7 +476,7 @@ def onboarding_check(f):
         conn = get_db_connection()
         try:
             cur = conn.cursor()
-            cur.execute("SELECT onboarding_complete FROM users WHERE id = ?", (user_id,))
+            cur.execute("SELECT onboarding_complete FROM users WHERE id = %s", (user_id,))
             user = cur.fetchone()
 
             if user and user['onboarding_complete'] == 0:
@@ -371,32 +496,32 @@ def get_next_onboarding_step(user_id):
         cur = conn.cursor()
 
         # Check if goals exist
-        cur.execute("SELECT COUNT(*) as count FROM goals WHERE user_id = ?", (user_id,))
+        cur.execute("SELECT COUNT(*) as count FROM goals WHERE user_id = %s", (user_id,))
         goals_count = cur.fetchone()['count']
         if goals_count == 0:
             return url_for('onboarding_goals')
 
         # Check if beliefs exist
-        cur.execute("SELECT COUNT(*) as count FROM identity_beliefs WHERE user_id = ?", (user_id,))
+        cur.execute("SELECT COUNT(*) as count FROM identity_beliefs WHERE user_id = %s", (user_id,))
         beliefs_count = cur.fetchone()['count']
         if beliefs_count == 0:
             return url_for('onboarding_beliefs')
 
         # Check if thoughts exist
-        cur.execute("SELECT COUNT(*) as count FROM positive_thoughts WHERE user_id = ?", (user_id,))
+        cur.execute("SELECT COUNT(*) as count FROM positive_thoughts WHERE user_id = %s", (user_id,))
         thoughts_count = cur.fetchone()['count']
         if thoughts_count == 0:
             return url_for('onboarding_thoughts')
 
         # Check if custom habits exist (non-sample)
-        cur.execute("SELECT COUNT(*) as count FROM habits WHERE user_id = ? AND is_sample = 0", (user_id,))
+        cur.execute("SELECT COUNT(*) as count FROM habits WHERE user_id = %s AND is_sample = 0", (user_id,))
         habits_count = cur.fetchone()['count']
 
         if habits_count == 0:
             return url_for('onboarding_habits')
 
         # Check if goal steps exist (at least one step across all goals)
-        cur.execute("SELECT COUNT(*) as count FROM goal_steps WHERE user_id = ?", (user_id,))
+        cur.execute("SELECT COUNT(*) as count FROM goal_steps WHERE user_id = %s", (user_id,))
         steps_count = cur.fetchone()['count']
 
         if steps_count == 0:
@@ -420,6 +545,18 @@ def get_greeting() -> str:
         return "Good evening"
     else:
         return "Welcome back"
+
+
+def sanitize_input(text):
+    """strip out any html or script tags from user input so nothing dangerous gets stored"""
+    if not text:
+        return text
+    # tags=[] means allow no html tags at all, strip=True removes them instead of escaping
+    cleaned = bleach.clean(text, tags=[], attributes={}, strip=True)
+    # bleach escapes & and < into html entities like &amp; and &lt;
+    # but jinja2 also auto-escapes on output, so that would double-escape
+    # unescape here so normal text displays correctly - jinja2 handles output safety
+    return html_module.unescape(cleaned)
 
 
 def normalise_entry_text(text: str) -> str:
@@ -525,7 +662,7 @@ def calculate_paralysis_score(emotion, behaviour, entry_text, user_id):
             cur = conn.cursor()
             cur.execute(
                 "SELECT predicted_emotion FROM journal_entries "
-                "WHERE user_id = ? AND created_at LIKE ?",
+                "WHERE user_id = %s AND created_at LIKE %s",
                 (user_id, today_str + "%"),
             )
             today_entries = cur.fetchall()
@@ -628,7 +765,7 @@ def get_daily_insight(user_id):
             cur.execute(
                 "SELECT predicted_emotion, predicted_behaviour, paralysis_score "
                 "FROM journal_entries "
-                "WHERE user_id = ? AND created_at LIKE ? "
+                "WHERE user_id = %s AND created_at LIKE %s "
                 "ORDER BY id ASC",
                 (user_id, today_str + "%"),
             )
@@ -1185,7 +1322,7 @@ def get_belief_for_reframe(user_id):
             cur = conn.cursor()
             cur.execute(
                 "SELECT belief_text FROM identity_beliefs "
-                "WHERE user_id = ? ORDER BY RANDOM() LIMIT 1",
+                "WHERE user_id = %s ORDER BY RANDOM() LIMIT 1",
                 (user_id,),
             )
             row = cur.fetchone()
@@ -1944,7 +2081,7 @@ def get_affirmation(predicted_emotion: str, user_id: int = None) -> str:
         try:
             cur = conn.cursor()
             cur.execute(
-                "SELECT belief_text FROM identity_beliefs WHERE user_id = ? ORDER BY RANDOM() LIMIT 1",
+                "SELECT belief_text FROM identity_beliefs WHERE user_id = %s ORDER BY RANDOM() LIMIT 1",
                 (user_id,),
             )
             row = cur.fetchone()
@@ -2031,7 +2168,7 @@ def get_alignment_state(user_id):
         cur = conn.cursor()
         cur.execute(
             "SELECT alignment_score, emotional_streak, last_journal_date "
-            "FROM alignment_state WHERE user_id = ?;",
+            "FROM alignment_state WHERE user_id = %s;",
             (user_id,),
         )
         row = cur.fetchone()
@@ -2049,8 +2186,8 @@ def update_alignment_score(user_id, delta: int):
         cur = conn.cursor()
         cur.execute(
             "UPDATE alignment_state "
-            "SET alignment_score = MAX(alignment_score + ?, 0) "
-            "WHERE user_id = ?;",
+            "SET alignment_score = MAX(alignment_score + %s, 0) "
+            "WHERE user_id = %s;",
             (delta, user_id),
         )
         conn.commit()
@@ -2065,7 +2202,7 @@ def update_emotional_streak_for_today(user_id):
     try:
         cur = conn.cursor()
         cur.execute(
-            "SELECT emotional_streak, last_journal_date FROM alignment_state WHERE user_id = ?;",
+            "SELECT emotional_streak, last_journal_date FROM alignment_state WHERE user_id = %s;",
             (user_id,),
         )
         row = cur.fetchone()
@@ -2094,8 +2231,8 @@ def update_emotional_streak_for_today(user_id):
                 streak = 1
 
         cur.execute(
-            "UPDATE alignment_state SET emotional_streak = ?, last_journal_date = ? "
-            "WHERE user_id = ?;",
+            "UPDATE alignment_state SET emotional_streak = %s, last_journal_date = %s "
+            "WHERE user_id = %s;",
             (streak, today.isoformat(), user_id),
         )
         conn.commit()
@@ -2114,12 +2251,13 @@ def landing():
 
 
 @app.route("/signup", methods=["GET", "POST"])
+@limiter.limit("5 per minute", methods=["POST"])
 def signup():
     if 'user_id' in session:
         return redirect(url_for('dashboard'))
 
     if request.method == "POST":
-        username = request.form.get("username", "").strip()
+        username = sanitize_input(request.form.get("username", "").strip())
         password = request.form.get("password", "")
         confirm_password = request.form.get("confirm_password", "")
 
@@ -2141,7 +2279,7 @@ def signup():
 
         conn = get_db_connection()
         cur = conn.cursor()
-        cur.execute("SELECT id FROM users WHERE username = ?", (username,))
+        cur.execute("SELECT id FROM users WHERE username = %s", (username,))
         existing = cur.fetchone()
 
         if existing:
@@ -2150,12 +2288,12 @@ def signup():
             return render_template("signup.html")
 
         password_hash = generate_password_hash(password)
-        cur.execute(
-            "INSERT INTO users (username, password_hash, created_at) VALUES (?, ?, ?)",
+        user_id = insert_and_get_id(
+            cur,
+            "INSERT INTO users (username, password_hash, created_at) VALUES (%s, %s, %s)",
             (username, password_hash, datetime.now().isoformat(timespec="seconds")),
         )
         conn.commit()
-        user_id = cur.lastrowid
         conn.close()
 
         initialize_user_data(user_id)
@@ -2169,6 +2307,7 @@ def signup():
 
 
 @app.route("/login", methods=["GET", "POST"])
+@limiter.limit("5 per minute", methods=["POST"])
 def login():
     if 'user_id' in session:
         return redirect(url_for('today'))
@@ -2179,7 +2318,7 @@ def login():
 
         conn = get_db_connection()
         cur = conn.cursor()
-        cur.execute("SELECT id, password_hash FROM users WHERE username = ?", (username,))
+        cur.execute("SELECT id, password_hash FROM users WHERE username = %s", (username,))
         user = cur.fetchone()
         conn.close()
 
@@ -2214,29 +2353,29 @@ def dashboard():
     cur = conn.cursor()
     cur.execute(
         "SELECT entry_text, predicted_emotion, created_at "
-        "FROM journal_entries WHERE user_id = ? ORDER BY id DESC LIMIT 1;",
+        "FROM journal_entries WHERE user_id = %s ORDER BY id DESC LIMIT 1;",
         (user_id,),
     )
     last_entry = cur.fetchone()
 
-    cur.execute("SELECT id, goal_text FROM goals WHERE user_id = ? ORDER BY id ASC", (user_id,))
+    cur.execute("SELECT id, goal_text FROM goals WHERE user_id = %s ORDER BY id ASC", (user_id,))
     goals = cur.fetchall()
 
     cur.execute("""
         SELECT ib.belief_text, g.goal_text
         FROM identity_beliefs ib
         LEFT JOIN goals g ON ib.linked_goal_id = g.id
-        WHERE ib.user_id = ?
+        WHERE ib.user_id = %s
         ORDER BY ib.id ASC
     """, (user_id,))
     beliefs = cur.fetchall()
 
-    cur.execute("SELECT COUNT(*) as count FROM journal_entries WHERE user_id = ?", (user_id,))
+    cur.execute("SELECT COUNT(*) as count FROM journal_entries WHERE user_id = %s", (user_id,))
     journal_count = cur.fetchone()["count"]
 
     # Surface one random identity belief as today's reminder (RAS reprogramming)
     cur.execute(
-        "SELECT belief_text FROM identity_beliefs WHERE user_id = ? ORDER BY RANDOM() LIMIT 1",
+        "SELECT belief_text FROM identity_beliefs WHERE user_id = %s ORDER BY RANDOM() LIMIT 1",
         (user_id,),
     )
     belief_row = cur.fetchone()
@@ -2247,12 +2386,12 @@ def dashboard():
     cur.execute(
         "SELECT COUNT(*) as count FROM habit_completions hc "
         "JOIN habits h ON hc.habit_id = h.id "
-        "WHERE h.user_id = ? AND date(hc.completed_at) = ?",
+        "WHERE h.user_id = %s AND date(hc.completed_at) = %s",
         (user_id, today_str_dash),
     )
     habits_done_today = cur.fetchone()['count']
     cur.execute(
-        "SELECT COUNT(*) as count FROM todos WHERE user_id = ? AND is_done = 1 AND date(created_at) = ?",
+        "SELECT COUNT(*) as count FROM todos WHERE user_id = %s AND is_done = 1 AND date(created_at) = %s",
         (user_id, today_str_dash),
     )
     todos_done_today = cur.fetchone()['count']
@@ -2294,6 +2433,7 @@ def dashboard():
 
 # main journaling page
 @app.route("/journal", methods=["GET", "POST"])
+@limiter.limit("30 per minute", methods=["POST"])
 @login_required
 @onboarding_check
 def journal():
@@ -2312,7 +2452,7 @@ def journal():
     error_message = None
 
     if request.method == "POST":
-        raw_text = request.form.get("entry_text", "")
+        raw_text = sanitize_input(request.form.get("entry_text", ""))
         entry_text = normalise_entry_text(raw_text)
 
         # Edge case: empty or whitespace-only text submitted
@@ -2377,18 +2517,18 @@ def journal():
                 conn = get_db_connection()
                 try:
                     cur = conn.cursor()
-                    cur.execute(
+                    new_entry_id = insert_and_get_id(
+                        cur,
                         "INSERT INTO journal_entries "
                         "(user_id, entry_text, predicted_emotion, predicted_behaviour, "
                         "paralysis_score, reframe, micro_task_text, micro_task_minutes, created_at) "
-                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                        "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
                         (user_id, entry_text, predicted_emotion, predicted_behaviour,
                          paralysis_score, reframe,
                          micro_task['task_text'], micro_task['estimated_minutes'],
                          datetime.now().isoformat(timespec="seconds")),
                     )
                     conn.commit()
-                    new_entry_id = cur.lastrowid
                 except Exception:
                     # Edge case: DB insert fails (locked DB, disk full, etc.)
                     error_message = "Your reflection was processed but could not be saved. Please try again."
@@ -2413,7 +2553,7 @@ def journal():
         cur.execute(
             "SELECT id, entry_text, predicted_emotion, predicted_behaviour, "
             "paralysis_score, reframe, micro_task_text, micro_task_minutes, created_at "
-            "FROM journal_entries WHERE user_id = ? ORDER BY id DESC;",
+            "FROM journal_entries WHERE user_id = %s ORDER BY id DESC;",
             (user_id,),
         )
         entries = cur.fetchall()
@@ -2457,7 +2597,7 @@ def edit_journal(entry_id):
     cur = conn.cursor()
     cur.execute(
         "SELECT id, entry_text, predicted_emotion, reframe, micro_task_text, micro_task_minutes, created_at "
-        "FROM journal_entries WHERE id = ? AND user_id = ?;",
+        "FROM journal_entries WHERE id = %s AND user_id = %s;",
         (entry_id, user_id),
     )
     entry = cur.fetchone()
@@ -2467,7 +2607,7 @@ def edit_journal(entry_id):
         return redirect(url_for("journal"))
 
     if request.method == "POST":
-        raw_text = request.form.get("entry_text", "")
+        raw_text = sanitize_input(request.form.get("entry_text", ""))
         entry_text = normalise_entry_text(raw_text)
 
         # Edge case: empty text or text exceeding max length
@@ -2516,10 +2656,10 @@ def edit_journal(entry_id):
                 try:
                     cur.execute(
                         "UPDATE journal_entries "
-                        "SET entry_text = ?, predicted_emotion = ?, predicted_behaviour = ?, "
-                        "paralysis_score = ?, reframe = ?, "
-                        "micro_task_text = ?, micro_task_minutes = ? "
-                        "WHERE id = ? AND user_id = ?;",
+                        "SET entry_text = %s, predicted_emotion = %s, predicted_behaviour = %s, "
+                        "paralysis_score = %s, reframe = %s, "
+                        "micro_task_text = %s, micro_task_minutes = %s "
+                        "WHERE id = %s AND user_id = %s;",
                         (entry_text, new_emotion, new_behaviour,
                          new_paralysis, new_reframe,
                          new_micro['task_text'], new_micro['estimated_minutes'],
@@ -2547,7 +2687,7 @@ def delete_journal(entry_id):
     conn = get_db_connection()
     cur = conn.cursor()
     cur.execute(
-        "DELETE FROM journal_entries WHERE id = ? AND user_id = ?;",
+        "DELETE FROM journal_entries WHERE id = %s AND user_id = %s;",
         (entry_id, user_id),
     )
     conn.commit()
@@ -2565,7 +2705,7 @@ def delete_journal(entry_id):
 @login_required
 def add_todo():
     user_id = session['user_id']
-    text = request.form.get("text", "").strip()
+    text = sanitize_input(request.form.get("text", "").strip())
     source = request.form.get("source", "manual")
     journal_entry_id = request.form.get("journal_entry_id")
     due_date = request.form.get("due_date")
@@ -2585,7 +2725,7 @@ def add_todo():
 
         cur.execute(
             "INSERT INTO todos (user_id, text, source, journal_entry_id, due_date, is_done, created_at) "
-            "VALUES (?, ?, ?, ?, ?, 0, ?)",
+            "VALUES (%s, %s, %s, %s, %s, 0, %s)",
             (user_id, text, source,
              journal_id,
              due_date if due_date else None,
@@ -2608,7 +2748,7 @@ def toggle_todo(todo_id):
 
     # read current state before toggling so we know the direction
     cur.execute(
-        "SELECT is_done FROM todos WHERE id = ? AND user_id = ?",
+        "SELECT is_done FROM todos WHERE id = %s AND user_id = %s",
         (todo_id, user_id),
     )
     row = cur.fetchone()
@@ -2620,7 +2760,7 @@ def toggle_todo(todo_id):
 
     cur.execute(
         "UPDATE todos SET is_done = CASE WHEN is_done = 0 THEN 1 ELSE 0 END "
-        "WHERE id = ? AND user_id = ?",
+        "WHERE id = %s AND user_id = %s",
         (todo_id, user_id),
     )
     conn.commit()
@@ -2655,28 +2795,28 @@ def toggle_habit(habit_id):
     cur = conn.cursor()
 
     # verify habit belongs to user
-    cur.execute("SELECT id FROM habits WHERE id = ? AND user_id = ?", (habit_id, user_id))
+    cur.execute("SELECT id FROM habits WHERE id = %s AND user_id = %s", (habit_id, user_id))
     if cur.fetchone() is None:
         conn.close()
         return redirect(url_for("today"))
 
     # check if already completed today
     cur.execute(
-        "SELECT id FROM habit_completions WHERE habit_id = ? AND date(completed_at) = ?",
+        "SELECT id FROM habit_completions WHERE habit_id = %s AND date(completed_at) = %s",
         (habit_id, today_str),
     )
     existing = cur.fetchone()
 
     if existing:
         # un-complete
-        cur.execute("DELETE FROM habit_completions WHERE id = ?", (existing['id'],))
+        cur.execute("DELETE FROM habit_completions WHERE id = %s", (existing['id'],))
         conn.commit()
         conn.close()
         return redirect(url_for("today"))
     else:
         # mark complete
         cur.execute(
-            "INSERT INTO habit_completions (habit_id, completed_at) VALUES (?, ?)",
+            "INSERT INTO habit_completions (habit_id, completed_at) VALUES (%s, %s)",
             (habit_id, datetime.now().isoformat(timespec="seconds")),
         )
         update_alignment_score(user_id, 1)
@@ -2689,7 +2829,7 @@ def toggle_habit(habit_id):
 @login_required
 def add_manual_todo():
     user_id = session['user_id']
-    text = request.form.get("todo_text", "").strip()
+    text = sanitize_input(request.form.get("todo_text", "").strip())
     due_date = request.form.get("due_date")
 
     if text:
@@ -2697,7 +2837,7 @@ def add_manual_todo():
         cur = conn.cursor()
         cur.execute(
             "INSERT INTO todos (user_id, text, source, due_date, is_done, created_at) "
-            "VALUES (?, ?, 'manual', ?, 0, ?)",
+            "VALUES (%s, %s, 'manual', %s, 0, %s)",
             (user_id, text, due_date if due_date else None,
              datetime.now().isoformat(timespec="seconds")),
         )
@@ -2718,7 +2858,7 @@ def hide_habit(habit_id):
         # only let users hide sample habits that belong to them
         cur.execute(
             "UPDATE habits SET is_hidden = 1 "
-            "WHERE id = ? AND user_id = ? AND is_sample = 1",
+            "WHERE id = %s AND user_id = %s AND is_sample = 1",
             (habit_id, user_id)
         )
         conn.commit()
@@ -2743,7 +2883,7 @@ def today():
         # Today's todos: not done, and either no due date or due today or overdue
         cur.execute(
             "SELECT id, text, source, journal_entry_id, due_date, is_done, created_at "
-            "FROM todos WHERE user_id = ? AND (is_done = 0 AND (due_date IS NULL OR due_date <= ?)) "
+            "FROM todos WHERE user_id = %s AND (is_done = 0 AND (due_date IS NULL OR due_date <= %s)) "
             "ORDER BY created_at DESC",
             (user_id, today_str),
         )
@@ -2752,7 +2892,7 @@ def today():
         # Recently completed todos (done today)
         cur.execute(
             "SELECT id, text, source, is_done, created_at "
-            "FROM todos WHERE user_id = ? AND is_done = 1 AND date(created_at) >= ? "
+            "FROM todos WHERE user_id = %s AND is_done = 1 AND date(created_at) >= %s "
             "ORDER BY created_at DESC LIMIT 10",
             (user_id, today_str),
         )
@@ -2767,11 +2907,11 @@ def today():
                    gs.is_done, gs.day_of_week, g.goal_text
             FROM goal_steps gs
             JOIN goals g ON gs.goal_id = g.id
-            WHERE gs.user_id = ? AND gs.is_done = 0
+            WHERE gs.user_id = %s AND gs.is_done = 0
             AND (
                 gs.frequency = 'daily'
-                OR (gs.frequency = 'weekly' AND (gs.day_of_week IS NULL OR gs.day_of_week = ?))
-                OR (gs.frequency = 'one-off' AND (gs.due_date IS NULL OR gs.due_date <= ?))
+                OR (gs.frequency = 'weekly' AND (gs.day_of_week IS NULL OR gs.day_of_week = %s))
+                OR (gs.frequency = 'one-off' AND (gs.due_date IS NULL OR gs.due_date <= %s))
             )
             ORDER BY gs.frequency ASC, gs.step_order ASC
         """, (user_id, today_weekday, today_str))
@@ -2780,7 +2920,7 @@ def today():
         # check which daily/weekly steps were already done today
         cur.execute(
             "SELECT step_id FROM step_completions "
-            "WHERE user_id = ? AND completed_date = ?",
+            "WHERE user_id = %s AND completed_date = %s",
             (user_id, today_str)
         )
         completed_step_ids = {row['step_id'] for row in cur.fetchall()}
@@ -2795,7 +2935,7 @@ def today():
         # all active habits (skip hidden ones)
         cur.execute(
             "SELECT id, name, is_sample FROM habits "
-            "WHERE user_id = ? AND (is_hidden IS NULL OR is_hidden = 0) "
+            "WHERE user_id = %s AND (is_hidden IS NULL OR is_hidden = 0) "
             "ORDER BY is_sample ASC, id ASC",
             (user_id,),
         )
@@ -2805,7 +2945,7 @@ def today():
         cur.execute(
             "SELECT habit_id FROM habit_completions hc "
             "JOIN habits h ON hc.habit_id = h.id "
-            "WHERE h.user_id = ? AND date(hc.completed_at) = ? "
+            "WHERE h.user_id = %s AND date(hc.completed_at) = %s "
             "AND (h.is_hidden IS NULL OR h.is_hidden = 0)",
             (user_id, today_str),
         )
@@ -2815,7 +2955,7 @@ def today():
         week_end = (date.today() + timedelta(days=7)).isoformat()
         cur.execute(
             "SELECT COUNT(*) as count FROM todos "
-            "WHERE user_id = ? AND is_done = 0 AND due_date IS NOT NULL AND due_date BETWEEN ? AND ?",
+            "WHERE user_id = %s AND is_done = 0 AND due_date IS NOT NULL AND due_date BETWEEN %s AND %s",
             (user_id, today_str, week_end),
         )
         upcoming_count = cur.fetchone()['count']
@@ -2825,7 +2965,7 @@ def today():
 
         # Daily identity belief reminder (cycles through beliefs)
         cur.execute(
-            "SELECT belief_text FROM identity_beliefs WHERE user_id = ? ORDER BY RANDOM() LIMIT 1",
+            "SELECT belief_text FROM identity_beliefs WHERE user_id = %s ORDER BY RANDOM() LIMIT 1",
             (user_id,),
         )
         belief_row = cur.fetchone()
@@ -2837,7 +2977,7 @@ def today():
         # Count active reflection days this week
         cur.execute(
             "SELECT COUNT(DISTINCT date(created_at)) as count "
-            "FROM journal_entries WHERE user_id = ? AND date(created_at) BETWEEN ? AND ?",
+            "FROM journal_entries WHERE user_id = %s AND date(created_at) BETWEEN %s AND %s",
             (user_id, week_start, today_str),
         )
         active_days_this_week = cur.fetchone()['count']
@@ -2846,7 +2986,7 @@ def today():
         cur.execute(
             "SELECT COUNT(*) as count FROM habit_completions hc "
             "JOIN habits h ON hc.habit_id = h.id "
-            "WHERE h.user_id = ? AND date(hc.completed_at) BETWEEN ? AND ?",
+            "WHERE h.user_id = %s AND date(hc.completed_at) BETWEEN %s AND %s",
             (user_id, week_start, today_str),
         )
         habits_done_this_week = cur.fetchone()['count']
@@ -2854,7 +2994,7 @@ def today():
         # Week days indicator (last 7 days) - OPTIMIZED: Single query instead of 7
         cur.execute(
             "SELECT DISTINCT date(created_at) as entry_date "
-            "FROM journal_entries WHERE user_id = ? AND date(created_at) BETWEEN ? AND ?",
+            "FROM journal_entries WHERE user_id = %s AND date(created_at) BETWEEN %s AND %s",
             (user_id, week_start, today_str),
         )
         active_dates = {row['entry_date'] for row in cur.fetchall()}
@@ -2891,9 +3031,9 @@ def today():
         show_weekly_summary = (active_days_this_week > 0 or habits_done_this_week > 0)
 
         # Stage indicator: Awareness > Alignment > Action
-        cur.execute("SELECT COUNT(*) as count FROM journal_entries WHERE user_id = ?", (user_id,))
+        cur.execute("SELECT COUNT(*) as count FROM journal_entries WHERE user_id = %s", (user_id,))
         journal_count = cur.fetchone()['count']
-        cur.execute("SELECT COUNT(*) as count FROM identity_beliefs WHERE user_id = ?", (user_id,))
+        cur.execute("SELECT COUNT(*) as count FROM identity_beliefs WHERE user_id = %s", (user_id,))
         has_beliefs = cur.fetchone()['count'] > 0
         action_taken_today = (habits_completed_today > 0 or len(done_todos) > 0)
 
@@ -2967,7 +3107,7 @@ def week():
         # all todos that fall in this week
         cur.execute(
             "SELECT id, text, due_date, is_done, source "
-            "FROM todos WHERE user_id = ? AND due_date BETWEEN ? AND ? "
+            "FROM todos WHERE user_id = %s AND due_date BETWEEN %s AND %s "
             "ORDER BY due_date ASC, created_at ASC",
             (user_id, week_start, week_end),
         )
@@ -2979,11 +3119,11 @@ def week():
                    gs.is_done, gs.day_of_week, g.goal_text
             FROM goal_steps gs
             JOIN goals g ON gs.goal_id = g.id
-            WHERE gs.user_id = ? AND gs.is_done = 0
+            WHERE gs.user_id = %s AND gs.is_done = 0
             AND (
                 gs.frequency = 'daily'
                 OR gs.frequency = 'weekly'
-                OR (gs.frequency = 'one-off' AND gs.due_date BETWEEN ? AND ?)
+                OR (gs.frequency = 'one-off' AND gs.due_date BETWEEN %s AND %s)
             )
             ORDER BY gs.step_order ASC
         """, (user_id, week_start, week_end))
@@ -2992,7 +3132,7 @@ def week():
         # which steps were completed on which days this week
         cur.execute(
             "SELECT step_id, completed_date FROM step_completions "
-            "WHERE user_id = ? AND completed_date BETWEEN ? AND ?",
+            "WHERE user_id = %s AND completed_date BETWEEN %s AND %s",
             (user_id, week_start, week_end)
         )
         week_step_comps = cur.fetchall()
@@ -3009,8 +3149,8 @@ def week():
         cur.execute(
             "SELECT id, entry_text, predicted_emotion, "
             "date(created_at) as entry_date "
-            "FROM journal_entries WHERE user_id = ? "
-            "AND date(created_at) BETWEEN ? AND ? "
+            "FROM journal_entries WHERE user_id = %s "
+            "AND date(created_at) BETWEEN %s AND %s "
             "ORDER BY created_at ASC",
             (user_id, week_start, week_end),
         )
@@ -3021,7 +3161,7 @@ def week():
             "SELECT h.name, date(hc.completed_at) as comp_date "
             "FROM habit_completions hc "
             "JOIN habits h ON hc.habit_id = h.id "
-            "WHERE h.user_id = ? AND date(hc.completed_at) BETWEEN ? AND ? "
+            "WHERE h.user_id = %s AND date(hc.completed_at) BETWEEN %s AND %s "
             "AND (h.is_hidden IS NULL OR h.is_hidden = 0)",
             (user_id, week_start, week_end),
         )
@@ -3030,7 +3170,7 @@ def week():
         # total visible habits for the completion fraction
         cur.execute(
             "SELECT COUNT(*) as count FROM habits "
-            "WHERE user_id = ? AND (is_hidden IS NULL OR is_hidden = 0)",
+            "WHERE user_id = %s AND (is_hidden IS NULL OR is_hidden = 0)",
             (user_id,),
         )
         total_habits = cur.fetchone()['count']
@@ -3038,7 +3178,7 @@ def week():
         # undated todos that still need doing
         cur.execute(
             "SELECT id, text, is_done, created_at "
-            "FROM todos WHERE user_id = ? AND is_done = 0 AND due_date IS NULL "
+            "FROM todos WHERE user_id = %s AND is_done = 0 AND due_date IS NULL "
             "ORDER BY created_at DESC LIMIT 15",
             (user_id,),
         )
@@ -3215,8 +3355,8 @@ def month():
         cur.execute(
             "SELECT id, entry_text, predicted_emotion, predicted_behaviour, "
             "paralysis_score, date(created_at) as entry_date, created_at "
-            "FROM journal_entries WHERE user_id = ? "
-            "AND date(created_at) BETWEEN ? AND ? "
+            "FROM journal_entries WHERE user_id = %s "
+            "AND date(created_at) BETWEEN %s AND %s "
             "ORDER BY created_at ASC",
             (user_id, month_start_str, month_end_str),
         )
@@ -3225,7 +3365,7 @@ def month():
         # todos that fall in this month
         cur.execute(
             "SELECT id, text, due_date, is_done, source "
-            "FROM todos WHERE user_id = ? AND due_date BETWEEN ? AND ? "
+            "FROM todos WHERE user_id = %s AND due_date BETWEEN %s AND %s "
             "ORDER BY due_date ASC",
             (user_id, month_start_str, month_end_str),
         )
@@ -3237,9 +3377,9 @@ def month():
                    gs.is_done, gs.day_of_week, g.goal_text
             FROM goal_steps gs
             JOIN goals g ON gs.goal_id = g.id
-            WHERE gs.user_id = ? AND gs.is_done = 0
+            WHERE gs.user_id = %s AND gs.is_done = 0
             AND (
-                (gs.frequency = 'one-off' AND gs.due_date BETWEEN ? AND ?)
+                (gs.frequency = 'one-off' AND gs.due_date BETWEEN %s AND %s)
                 OR gs.frequency = 'daily'
                 OR gs.frequency = 'weekly'
             )
@@ -3250,7 +3390,7 @@ def month():
         # step completions for this month so we can show what was done
         cur.execute(
             "SELECT step_id, completed_date FROM step_completions "
-            "WHERE user_id = ? AND completed_date BETWEEN ? AND ?",
+            "WHERE user_id = %s AND completed_date BETWEEN %s AND %s",
             (user_id, month_start_str, month_end_str)
         )
         month_step_comps = cur.fetchall()
@@ -3268,7 +3408,7 @@ def month():
             "SELECT h.name, date(hc.completed_at) as comp_date "
             "FROM habit_completions hc "
             "JOIN habits h ON hc.habit_id = h.id "
-            "WHERE h.user_id = ? AND date(hc.completed_at) BETWEEN ? AND ? "
+            "WHERE h.user_id = %s AND date(hc.completed_at) BETWEEN %s AND %s "
             "AND (h.is_hidden IS NULL OR h.is_hidden = 0)",
             (user_id, month_start_str, month_end_str),
         )
@@ -3277,7 +3417,7 @@ def month():
         # total visible habits for the fraction
         cur.execute(
             "SELECT COUNT(*) as count FROM habits "
-            "WHERE user_id = ? AND (is_hidden IS NULL OR is_hidden = 0)",
+            "WHERE user_id = %s AND (is_hidden IS NULL OR is_hidden = 0)",
             (user_id,),
         )
         total_habits = cur.fetchone()['count']
@@ -3450,13 +3590,13 @@ def habits():
 
     if request.method == "POST":
         # if user added a new habit/task
-        new_habit = request.form.get("new_habit", "").strip()
+        new_habit = sanitize_input(request.form.get("new_habit", "").strip())
         if new_habit:
             conn = get_db_connection()
             cur = conn.cursor()
             cur.execute(
                 "INSERT INTO habits (user_id, name, is_sample, created_at) "
-                "VALUES (?, ?, 0, ?);",
+                "VALUES (%s, %s, 0, %s);",
                 (user_id, new_habit, datetime.now().isoformat(timespec="seconds")),
             )
             conn.commit()
@@ -3478,7 +3618,7 @@ def habits():
 
                 # verify habit belongs to this user
                 cur.execute(
-                    "SELECT id FROM habits WHERE id = ? AND user_id = ?;",
+                    "SELECT id FROM habits WHERE id = %s AND user_id = %s;",
                     (hid_int, user_id),
                 )
                 if cur.fetchone() is None:
@@ -3486,7 +3626,7 @@ def habits():
 
                 cur.execute(
                     "INSERT INTO habit_completions (habit_id, completed_at) "
-                    "VALUES (?, ?);",
+                    "VALUES (%s, %s);",
                     (hid_int, now),
                 )
                 # each completed habit counts as identity-aligned behaviour
@@ -3503,7 +3643,7 @@ def habits():
         SELECT h.id, h.name, h.is_sample, h.created_at, g.goal_text
         FROM habits h
         LEFT JOIN goals g ON h.linked_goal_id = g.id
-        WHERE h.user_id = ? AND (h.is_hidden IS NULL OR h.is_hidden = 0)
+        WHERE h.user_id = %s AND (h.is_hidden IS NULL OR h.is_hidden = 0)
         ORDER BY h.id ASC
     """, (user_id,))
     habits_rows = cur.fetchall()
@@ -3524,7 +3664,7 @@ def analytics():
     cur.execute("""
         SELECT predicted_emotion, COUNT(*) as count
         FROM journal_entries
-        WHERE user_id = ?
+        WHERE user_id = %s
         GROUP BY predicted_emotion
     """, (user_id,))
     emotion_data = cur.fetchall()
@@ -3535,7 +3675,7 @@ def analytics():
     cur.execute("""
         SELECT COUNT(DISTINCT date(created_at)) AS active_days
         FROM journal_entries
-        WHERE user_id = ? AND date(created_at) >= ?
+        WHERE user_id = %s AND date(created_at) >= %s
     """, (user_id, last_week))
     active_days = cur.fetchone()["active_days"]
 
@@ -3544,7 +3684,7 @@ def analytics():
         SELECT COUNT(*) AS habits_done
         FROM habit_completions hc
         JOIN habits h ON hc.habit_id = h.id
-        WHERE h.user_id = ? AND date(hc.completed_at) >= ?
+        WHERE h.user_id = %s AND date(hc.completed_at) >= %s
     """, (user_id, last_week))
     habits_done = cur.fetchone()["habits_done"]
 
@@ -3587,7 +3727,7 @@ def goals_page():
 
         # grab all goals for this user
         cur.execute(
-            "SELECT id, goal_text FROM goals WHERE user_id = ? ORDER BY id ASC",
+            "SELECT id, goal_text FROM goals WHERE user_id = %s ORDER BY id ASC",
             (user_id,)
         )
         goals = cur.fetchall()
@@ -3595,7 +3735,7 @@ def goals_page():
         # grab all steps grouped by goal
         cur.execute(
             "SELECT id, goal_id, step_text, step_order, frequency, due_date, day_of_week, is_done, created_at "
-            "FROM goal_steps WHERE user_id = ? ORDER BY goal_id ASC, step_order ASC",
+            "FROM goal_steps WHERE user_id = %s ORDER BY goal_id ASC, step_order ASC",
             (user_id,)
         )
         all_steps = [dict(row) for row in cur.fetchall()]
@@ -3604,14 +3744,14 @@ def goals_page():
         today_str = date.today().isoformat()
         cur.execute(
             "SELECT step_id FROM step_completions "
-            "WHERE user_id = ? AND completed_date = ?",
+            "WHERE user_id = %s AND completed_date = %s",
             (user_id, today_str)
         )
         completed_today_ids = {row['step_id'] for row in cur.fetchall()}
 
         # also grab identity beliefs so we can show them under each goal
         cur.execute(
-            "SELECT linked_goal_id, belief_text FROM identity_beliefs WHERE user_id = ?",
+            "SELECT linked_goal_id, belief_text FROM identity_beliefs WHERE user_id = %s",
             (user_id,)
         )
         beliefs_map = {row['linked_goal_id']: row['belief_text'] for row in cur.fetchall()}
@@ -3653,7 +3793,7 @@ def add_goal_step():
     """Add a new micro-step to a goal"""
     user_id = session['user_id']
     goal_id = request.form.get("goal_id")
-    step_text = request.form.get("step_text", "").strip()
+    step_text = sanitize_input(request.form.get("step_text", "").strip())
     frequency = request.form.get("frequency", "one-off").strip()
     due_date = request.form.get("due_date", "").strip() or None
 
@@ -3695,14 +3835,14 @@ def add_goal_step():
         cur = conn.cursor()
 
         # make sure this goal actually belongs to the user
-        cur.execute("SELECT id FROM goals WHERE id = ? AND user_id = ?", (goal_id, user_id))
+        cur.execute("SELECT id FROM goals WHERE id = %s AND user_id = %s", (goal_id, user_id))
         if cur.fetchone() is None:
             return redirect(url_for("goals_page", error="That intention was not found."))
 
         # figure out the next step order number for this goal
         cur.execute(
             "SELECT COALESCE(MAX(step_order), 0) as max_order FROM goal_steps "
-            "WHERE goal_id = ? AND user_id = ?",
+            "WHERE goal_id = %s AND user_id = %s",
             (goal_id, user_id)
         )
         next_order = cur.fetchone()['max_order'] + 1
@@ -3710,7 +3850,7 @@ def add_goal_step():
         now = datetime.now().isoformat(timespec="seconds")
         cur.execute(
             "INSERT INTO goal_steps (goal_id, user_id, step_text, step_order, frequency, due_date, day_of_week, is_done, created_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?)",
+            "VALUES (%s, %s, %s, %s, %s, %s, %s, 0, %s)",
             (goal_id, user_id, step_text, next_order, frequency, due_date, day_of_week, now)
         )
         conn.commit()
@@ -3735,7 +3875,7 @@ def toggle_goal_step(step_id):
 
         # check the step exists and belongs to this user
         cur.execute(
-            "SELECT is_done, frequency FROM goal_steps WHERE id = ? AND user_id = ?",
+            "SELECT is_done, frequency FROM goal_steps WHERE id = %s AND user_id = %s",
             (step_id, user_id)
         )
         row = cur.fetchone()
@@ -3749,20 +3889,20 @@ def toggle_goal_step(step_id):
             # recurring steps track completion per day in step_completions
             cur.execute(
                 "SELECT id FROM step_completions "
-                "WHERE step_id = ? AND user_id = ? AND completed_date = ?",
+                "WHERE step_id = %s AND user_id = %s AND completed_date = %s",
                 (step_id, user_id, today_str)
             )
             existing = cur.fetchone()
 
             if existing:
                 # already done today so undo it
-                cur.execute("DELETE FROM step_completions WHERE id = ?", (existing['id'],))
+                cur.execute("DELETE FROM step_completions WHERE id = %s", (existing['id'],))
                 was_done = True
             else:
                 # mark it done for today
                 cur.execute(
                     "INSERT INTO step_completions (step_id, user_id, completed_date) "
-                    "VALUES (?, ?, ?)",
+                    "VALUES (%s, %s, %s)",
                     (step_id, user_id, today_str)
                 )
                 was_done = False
@@ -3771,7 +3911,7 @@ def toggle_goal_step(step_id):
             was_done = bool(row['is_done'])
             cur.execute(
                 "UPDATE goal_steps SET is_done = CASE WHEN is_done = 0 THEN 1 ELSE 0 END "
-                "WHERE id = ? AND user_id = ?",
+                "WHERE id = %s AND user_id = %s",
                 (step_id, user_id)
             )
 
@@ -3815,7 +3955,7 @@ def delete_goal_step(step_id):
 
         # make sure this step belongs to the user before deleting
         cur.execute(
-            "SELECT id, is_done, frequency FROM goal_steps WHERE id = ? AND user_id = ?",
+            "SELECT id, is_done, frequency FROM goal_steps WHERE id = %s AND user_id = %s",
             (step_id, user_id)
         )
         row = cur.fetchone()
@@ -3826,14 +3966,14 @@ def delete_goal_step(step_id):
         completion_count = 0
         if row['frequency'] in ('daily', 'weekly'):
             cur.execute(
-                "SELECT COUNT(*) as count FROM step_completions WHERE step_id = ? AND user_id = ?",
+                "SELECT COUNT(*) as count FROM step_completions WHERE step_id = %s AND user_id = %s",
                 (step_id, user_id)
             )
             completion_count = cur.fetchone()['count']
             # clean up completion records before deleting the step
-            cur.execute("DELETE FROM step_completions WHERE step_id = ? AND user_id = ?", (step_id, user_id))
+            cur.execute("DELETE FROM step_completions WHERE step_id = %s AND user_id = %s", (step_id, user_id))
 
-        cur.execute("DELETE FROM goal_steps WHERE id = ? AND user_id = ?", (step_id, user_id))
+        cur.execute("DELETE FROM goal_steps WHERE id = %s AND user_id = %s", (step_id, user_id))
         conn.commit()
     finally:
         conn.close()
@@ -3852,7 +3992,7 @@ def delete_goal_step(step_id):
 def edit_goal_step(step_id):
     """Update a step's text, frequency, or due date"""
     user_id = session['user_id']
-    new_text = request.form.get("step_text", "").strip()
+    new_text = sanitize_input(request.form.get("step_text", "").strip())
     new_frequency = request.form.get("frequency", "").strip()
     new_due_date = request.form.get("due_date", "").strip() or None
 
@@ -3886,7 +4026,7 @@ def edit_goal_step(step_id):
 
         # only update if this step belongs to the user
         cur.execute(
-            "SELECT id, frequency, is_done FROM goal_steps WHERE id = ? AND user_id = ?",
+            "SELECT id, frequency, is_done FROM goal_steps WHERE id = %s AND user_id = %s",
             (step_id, user_id)
         )
         row = cur.fetchone()
@@ -3897,15 +4037,15 @@ def edit_goal_step(step_id):
 
         # if switching from one-off (done) to daily/weekly, reset is_done so it shows up again
         if old_freq == 'one-off' and new_frequency in ('daily', 'weekly') and row['is_done']:
-            cur.execute("UPDATE goal_steps SET is_done = 0 WHERE id = ?", (step_id,))
+            cur.execute("UPDATE goal_steps SET is_done = 0 WHERE id = %s", (step_id,))
 
         # if switching away from daily/weekly, clean up old step_completions
         if old_freq in ('daily', 'weekly') and new_frequency == 'one-off':
-            cur.execute("DELETE FROM step_completions WHERE step_id = ? AND user_id = ?", (step_id, user_id))
+            cur.execute("DELETE FROM step_completions WHERE step_id = %s AND user_id = %s", (step_id, user_id))
 
         cur.execute(
-            "UPDATE goal_steps SET step_text = ?, frequency = ?, due_date = ?, day_of_week = ? "
-            "WHERE id = ? AND user_id = ?",
+            "UPDATE goal_steps SET step_text = %s, frequency = %s, due_date = %s, day_of_week = %s "
+            "WHERE id = %s AND user_id = %s",
             (new_text, new_frequency, new_due_date, new_day_of_week, step_id, user_id)
         )
         conn.commit()
@@ -3928,9 +4068,9 @@ def onboarding_goals():
     user_id = session['user_id']
 
     if request.method == "POST":
-        goal_1 = request.form.get("goal_1", "").strip()
-        goal_2 = request.form.get("goal_2", "").strip()
-        goal_3 = request.form.get("goal_3", "").strip()
+        goal_1 = sanitize_input(request.form.get("goal_1", "").strip())
+        goal_2 = sanitize_input(request.form.get("goal_2", "").strip())
+        goal_3 = sanitize_input(request.form.get("goal_3", "").strip())
 
         if not goal_1 or not goal_2 or not goal_3:
             flash("Please enter all 3 goals.", "error")
@@ -3939,13 +4079,13 @@ def onboarding_goals():
         # Delete existing goals if any (allow re-doing this step)
         conn = get_db_connection()
         cur = conn.cursor()
-        cur.execute("DELETE FROM goals WHERE user_id = ?", (user_id,))
+        cur.execute("DELETE FROM goals WHERE user_id = %s", (user_id,))
 
         # Insert new goals
         now = datetime.now().isoformat(timespec="seconds")
         for goal_text in [goal_1, goal_2, goal_3]:
             cur.execute(
-                "INSERT INTO goals (user_id, goal_text, created_at) VALUES (?, ?, ?)",
+                "INSERT INTO goals (user_id, goal_text, created_at) VALUES (%s, %s, %s)",
                 (user_id, goal_text, now)
             )
         conn.commit()
@@ -3956,7 +4096,7 @@ def onboarding_goals():
     # GET: load existing goals if any
     conn = get_db_connection()
     cur = conn.cursor()
-    cur.execute("SELECT goal_text FROM goals WHERE user_id = ? ORDER BY id ASC", (user_id,))
+    cur.execute("SELECT goal_text FROM goals WHERE user_id = %s ORDER BY id ASC", (user_id,))
     existing_goals = [row['goal_text'] for row in cur.fetchall()]
     conn.close()
 
@@ -3977,7 +4117,7 @@ def onboarding_beliefs():
     # Load user's goals
     conn = get_db_connection()
     cur = conn.cursor()
-    cur.execute("SELECT id, goal_text FROM goals WHERE user_id = ? ORDER BY id ASC", (user_id,))
+    cur.execute("SELECT id, goal_text FROM goals WHERE user_id = %s ORDER BY id ASC", (user_id,))
     goals = cur.fetchall()
     conn.close()
 
@@ -3989,7 +4129,7 @@ def onboarding_beliefs():
         beliefs_data = []
         for goal in goals:
             belief_key = f"belief_{goal['id']}"
-            belief_text = request.form.get(belief_key, "").strip()
+            belief_text = sanitize_input(request.form.get(belief_key, "").strip())
             if belief_text:
                 beliefs_data.append((goal['id'], belief_text))
 
@@ -4000,13 +4140,13 @@ def onboarding_beliefs():
         # Delete existing beliefs and insert new ones
         conn = get_db_connection()
         cur = conn.cursor()
-        cur.execute("DELETE FROM identity_beliefs WHERE user_id = ?", (user_id,))
+        cur.execute("DELETE FROM identity_beliefs WHERE user_id = %s", (user_id,))
 
         now = datetime.now().isoformat(timespec="seconds")
         for goal_id, belief_text in beliefs_data:
             cur.execute(
                 "INSERT INTO identity_beliefs (user_id, belief_text, linked_goal_id, created_at) "
-                "VALUES (?, ?, ?, ?)",
+                "VALUES (%s, %s, %s, %s)",
                 (user_id, belief_text, goal_id, now)
             )
         conn.commit()
@@ -4018,7 +4158,7 @@ def onboarding_beliefs():
     conn = get_db_connection()
     cur = conn.cursor()
     cur.execute(
-        "SELECT linked_goal_id, belief_text FROM identity_beliefs WHERE user_id = ?",
+        "SELECT linked_goal_id, belief_text FROM identity_beliefs WHERE user_id = %s",
         (user_id,)
     )
     existing_beliefs = {row['linked_goal_id']: row['belief_text'] for row in cur.fetchall()}
@@ -4043,7 +4183,7 @@ def onboarding_thoughts():
     conn = get_db_connection()
     cur = conn.cursor()
     cur.execute(
-        "SELECT id, belief_text FROM identity_beliefs WHERE user_id = ? ORDER BY id ASC",
+        "SELECT id, belief_text FROM identity_beliefs WHERE user_id = %s ORDER BY id ASC",
         (user_id,)
     )
     beliefs = cur.fetchall()
@@ -4057,7 +4197,7 @@ def onboarding_thoughts():
         thoughts_data = []
         for belief in beliefs:
             thought_key = f"thought_{belief['id']}"
-            thought_text = request.form.get(thought_key, "").strip()
+            thought_text = sanitize_input(request.form.get(thought_key, "").strip())
             if thought_text:
                 thoughts_data.append((belief['id'], thought_text))
 
@@ -4068,13 +4208,13 @@ def onboarding_thoughts():
         # Delete existing thoughts and insert new ones
         conn = get_db_connection()
         cur = conn.cursor()
-        cur.execute("DELETE FROM positive_thoughts WHERE user_id = ?", (user_id,))
+        cur.execute("DELETE FROM positive_thoughts WHERE user_id = %s", (user_id,))
 
         now = datetime.now().isoformat(timespec="seconds")
         for belief_id, thought_text in thoughts_data:
             cur.execute(
                 "INSERT INTO positive_thoughts (user_id, thought_text, linked_belief_id, created_at) "
-                "VALUES (?, ?, ?, ?)",
+                "VALUES (%s, %s, %s, %s)",
                 (user_id, thought_text, belief_id, now)
             )
         conn.commit()
@@ -4086,7 +4226,7 @@ def onboarding_thoughts():
     conn = get_db_connection()
     cur = conn.cursor()
     cur.execute(
-        "SELECT linked_belief_id, thought_text FROM positive_thoughts WHERE user_id = ?",
+        "SELECT linked_belief_id, thought_text FROM positive_thoughts WHERE user_id = %s",
         (user_id,)
     )
     existing_thoughts = {row['linked_belief_id']: row['thought_text'] for row in cur.fetchall()}
@@ -4110,7 +4250,7 @@ def onboarding_habits():
     # Load user's goals
     conn = get_db_connection()
     cur = conn.cursor()
-    cur.execute("SELECT id, goal_text FROM goals WHERE user_id = ? ORDER BY id ASC", (user_id,))
+    cur.execute("SELECT id, goal_text FROM goals WHERE user_id = %s ORDER BY id ASC", (user_id,))
     goals = cur.fetchall()
     conn.close()
 
@@ -4122,7 +4262,7 @@ def onboarding_habits():
         habits_data = []
         for goal in goals:
             habit_key = f"habit_{goal['id']}"
-            habit_text = request.form.get(habit_key, "").strip()
+            habit_text = sanitize_input(request.form.get(habit_key, "").strip())
             if habit_text:
                 habits_data.append((goal['id'], habit_text))
 
@@ -4133,13 +4273,13 @@ def onboarding_habits():
         # Delete existing custom habits (is_sample = 0) and insert new ones
         conn = get_db_connection()
         cur = conn.cursor()
-        cur.execute("DELETE FROM habits WHERE user_id = ? AND is_sample = 0", (user_id,))
+        cur.execute("DELETE FROM habits WHERE user_id = %s AND is_sample = 0", (user_id,))
 
         now = datetime.now().isoformat(timespec="seconds")
         for goal_id, habit_text in habits_data:
             cur.execute(
                 "INSERT INTO habits (user_id, name, is_sample, linked_goal_id, created_at) "
-                "VALUES (?, ?, 0, ?, ?)",
+                "VALUES (%s, %s, 0, %s, %s)",
                 (user_id, habit_text, goal_id, now)
             )
 
@@ -4152,7 +4292,7 @@ def onboarding_habits():
     conn = get_db_connection()
     cur = conn.cursor()
     cur.execute(
-        "SELECT linked_goal_id, name FROM habits WHERE user_id = ? AND is_sample = 0",
+        "SELECT linked_goal_id, name FROM habits WHERE user_id = %s AND is_sample = 0",
         (user_id,)
     )
     existing_habits = {row['linked_goal_id']: row['name'] for row in cur.fetchall()}
@@ -4178,7 +4318,7 @@ def onboarding_steps():
     try:
         cur = conn.cursor()
 
-        cur.execute("SELECT id, goal_text FROM goals WHERE user_id = ? ORDER BY id ASC", (user_id,))
+        cur.execute("SELECT id, goal_text FROM goals WHERE user_id = %s ORDER BY id ASC", (user_id,))
         goals = cur.fetchall()
 
         if not goals:
@@ -4186,7 +4326,7 @@ def onboarding_steps():
             return redirect(url_for('onboarding_goals'))
 
         # check habits exist (can't skip to step 5 without step 4)
-        cur.execute("SELECT COUNT(*) as count FROM habits WHERE user_id = ? AND is_sample = 0", (user_id,))
+        cur.execute("SELECT COUNT(*) as count FROM habits WHERE user_id = %s AND is_sample = 0", (user_id,))
         if cur.fetchone()['count'] == 0:
             flash("Please complete the habits step first.", "error")
             return redirect(url_for('onboarding_habits'))
@@ -4196,8 +4336,8 @@ def onboarding_steps():
             steps_added = 0
 
             # delete existing steps and their completions (allow re-doing this step)
-            cur.execute("DELETE FROM step_completions WHERE user_id = ?", (user_id,))
-            cur.execute("DELETE FROM goal_steps WHERE user_id = ?", (user_id,))
+            cur.execute("DELETE FROM step_completions WHERE user_id = %s", (user_id,))
+            cur.execute("DELETE FROM goal_steps WHERE user_id = %s", (user_id,))
 
             for goal in goals:
                 goal_id = goal['id']
@@ -4206,7 +4346,7 @@ def onboarding_steps():
                 # each goal can have up to 5 steps from the form
                 while step_index <= 5:
                     field_name = f"step_{goal_id}_{step_index}"
-                    step_text = request.form.get(field_name, "").strip()
+                    step_text = sanitize_input(request.form.get(field_name, "").strip())
 
                     if step_text:
                         # cap step text at 500 chars
@@ -4231,7 +4371,7 @@ def onboarding_steps():
 
                         cur.execute(
                             "INSERT INTO goal_steps (goal_id, user_id, step_text, step_order, frequency, day_of_week, is_done, created_at) "
-                            "VALUES (?, ?, ?, ?, ?, ?, 0, ?)",
+                            "VALUES (%s, %s, %s, %s, %s, %s, 0, %s)",
                             (goal_id, user_id, step_text, step_index, frequency, day_of_week, now)
                         )
                         steps_added += 1
@@ -4250,7 +4390,7 @@ def onboarding_steps():
                 )
 
             # mark onboarding as complete
-            cur.execute("UPDATE users SET onboarding_complete = 1 WHERE id = ?", (user_id,))
+            cur.execute("UPDATE users SET onboarding_complete = 1 WHERE id = %s", (user_id,))
             conn.commit()
 
             flash("Onboarding complete! Welcome to your journey.", "success")
@@ -4259,7 +4399,7 @@ def onboarding_steps():
         # GET: load any existing steps (if user is re-doing this step)
         cur.execute(
             "SELECT goal_id, step_order, step_text, frequency, day_of_week FROM goal_steps "
-            "WHERE user_id = ? ORDER BY goal_id ASC, step_order ASC",
+            "WHERE user_id = %s ORDER BY goal_id ASC, step_order ASC",
             (user_id,)
         )
         rows = cur.fetchall()
@@ -4288,7 +4428,23 @@ def onboarding_steps():
     )
 
 
+# csrf error handler - shows a friendly page when a form token is missing or expired
+@app.errorhandler(CSRFError)
+def handle_csrf_error(e):
+    """catches csrf validation failures and shows a nice error instead of crashing"""
+    return render_template('csrf_error.html'), 400
+
+
+# rate limit error handler - shows a friendly page when someone sends too many requests
+@app.errorhandler(429)
+def handle_rate_limit_error(e):
+    """catches rate limit exceeded and tells the user to slow down"""
+    return render_template('rate_limit_error.html'), 429
+
+
 if __name__ == "__main__":
-    init_db()
-    migrate_db_for_onboarding()
+    # sqlite needs tables created on startup, postgres uses migrate_to_postgres.py instead
+    if not USE_POSTGRES:
+        init_db()
+        migrate_db_for_onboarding()
     app.run(debug=True)

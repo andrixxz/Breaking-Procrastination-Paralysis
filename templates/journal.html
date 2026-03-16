@@ -81,6 +81,7 @@
 
         <!-- journal form -->
         <form method="post" class="fade-in-up">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
             <div class="form-group">
                 <label for="entry_text" class="form-label">What are you noticing right now?</label>
                 <textarea
@@ -166,6 +167,7 @@
                     {{ micro_task.why_this }}
                 </p>
                 <form method="post" action="{{ url_for('add_todo') }}" style="display: inline;">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                     <input type="hidden" name="text" value="{{ micro_task.task_text }}">
                     <input type="hidden" name="source" value="journal">
                     <input type="hidden" name="journal_entry_id" value="{{ new_entry_id }}">
@@ -250,6 +252,7 @@
                         <form method="post"
                               action="{{ url_for('delete_journal', entry_id=entry['id']) }}"
                               style="display: inline;">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                             <button type="submit"
                                     class="btn-danger-soft"
                                     onclick="return confirm('Are you sure you want to remove this reflection?');">
@@ -265,6 +268,7 @@
                         <span class="habit-tag">{{ entry["micro_task_minutes"] }} min</span>
                     </p>
                     <form method="post" action="{{ url_for('add_todo') }}" style="flex-shrink: 0;">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                         <input type="hidden" name="text" value="{{ entry['micro_task_text'] }}">
                         <input type="hidden" name="source" value="journal">
                         <input type="hidden" name="journal_entry_id" value="{{ entry['id'] }}">

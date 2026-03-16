@@ -47,6 +47,7 @@
         </div>
 
         <form method="post" class="fade-in-up">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
             <div class="form-group">
                 <label for="entry_text" class="form-label">Your reflection</label>
                 <textarea

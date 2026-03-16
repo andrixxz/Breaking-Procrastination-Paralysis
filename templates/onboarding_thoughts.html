@@ -50,6 +50,7 @@
         {% endwith %}
 
         <form method="post" class="fade-in-up">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
 
             {% for belief in beliefs %}
             <div class="card" style="margin-bottom: 24px; padding: 24px;">

@@ -50,6 +50,7 @@
         {% endwith %}
 
         <form method="post" class="fade-in-up">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
 
             <div class="form-group">
                 <label for="goal_1" class="form-label">Intention 1</label>
