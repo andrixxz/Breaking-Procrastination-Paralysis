@@ -68,7 +68,7 @@
                     <p>A slow breath activates your parasympathetic nervous system, which calms the fight-or-flight response before you write.</p>
                 </details>
             </div>
-            <button type="button" class="grounding-toggle" id="groundingToggle" onclick="toggleGrounding()">Hide this</button>
+            <button type="button" class="grounding-toggle" id="groundingToggle">Hide this</button>
         </div>
 
         <!-- first-time user context (shown only before first entry) -->
@@ -255,7 +255,7 @@
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                             <button type="submit"
                                     class="btn-danger-soft"
-                                    onclick="return confirm('Are you sure you want to remove this reflection?');">
+                                    data-confirm="Are you sure you want to remove this reflection?">
                                 Remove
                             </button>
                         </form>
@@ -296,7 +296,7 @@
 
 <!-- cursor glow effect -->
 <div class="cursor-glow" id="cursorGlow"></div>
-<script>
+<script nonce="{{ csp_nonce() }}">
 // grounding prompt toggle — remembers whether user collapsed it
 function getGroundingHidden() {
     try { return localStorage.getItem('groundingHidden') === '1'; } catch(e) { return false; }
@@ -332,8 +332,20 @@ function toggleGrounding() {
         if (prompt) prompt.classList.add('grounding-collapsed');
     }
 })();
+
+// hook up the grounding toggle button
+document.getElementById('groundingToggle').addEventListener('click', toggleGrounding);
+
+// hook up delete confirmation on buttons with data-confirm
+document.querySelectorAll('[data-confirm]').forEach(function(btn) {
+    btn.addEventListener('click', function(e) {
+        if (!confirm(btn.getAttribute('data-confirm'))) {
+            e.preventDefault();
+        }
+    });
+});
 </script>
-<script>
+<script nonce="{{ csp_nonce() }}">
 (function() {
     const glow = document.getElementById('cursorGlow');
     if (!glow || window.innerWidth < 768) return;

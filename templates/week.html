@@ -63,11 +63,11 @@
 
         <!-- mobile day navigation - only visible on small screens -->
         <div class="week-mobile-nav" id="weekMobileNav">
-            <button type="button" id="weekPrevBtn" class="week-nav-btn" onclick="changeDay(-1)">
+            <button type="button" id="weekPrevBtn" class="week-nav-btn">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
             </button>
             <span class="week-nav-label" id="mobileDayLabel"></span>
-            <button type="button" id="weekNextBtn" class="week-nav-btn" onclick="changeDay(1)">
+            <button type="button" id="weekNextBtn" class="week-nav-btn">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
             </button>
         </div>
@@ -232,7 +232,7 @@
 </div>
 
 <div class="cursor-glow" id="cursorGlow"></div>
-<script>
+<script nonce="{{ csp_nonce() }}">
 (function() {
     var glow = document.getElementById('cursorGlow');
     if (!glow || window.innerWidth < 768) return;
@@ -289,11 +289,15 @@
         updateMobile();
     }
 
-    // expose changeDay to the buttons
+    // moved from inline onclick for CSP
     window.changeDay = function(offset) {
         currentDay = Math.max(0, Math.min(cards.length - 1, currentDay + offset));
         updateMobile();
     };
+
+    // hook up the prev/next buttons
+    if (prevBtn) prevBtn.addEventListener('click', function() { changeDay(-1); });
+    if (nextBtn) nextBtn.addEventListener('click', function() { changeDay(1); });
 })();
 </script>
 </body>

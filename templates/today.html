@@ -278,7 +278,6 @@
                         <input
                             class="habit-checkbox"
                             type="checkbox"
-                            onchange="this.form.submit()"
                             {{ 'checked' if h['id'] in completed_habit_ids }}
                         >
                         <label class="habit-label">
@@ -336,7 +335,14 @@
 </div>
 
 <div class="cursor-glow" id="cursorGlow"></div>
-<script>
+<script nonce="{{ csp_nonce() }}">
+// auto-submit habit forms when the checkbox is toggled
+document.querySelectorAll('.habit-checkbox[type="checkbox"]').forEach(function(cb) {
+    cb.addEventListener('change', function() {
+        this.form.submit();
+    });
+});
+
 (function() {
     const glow = document.getElementById('cursorGlow');
     if (!glow || window.innerWidth < 768) return;

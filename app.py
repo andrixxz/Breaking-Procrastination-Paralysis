@@ -1,5 +1,6 @@
 from flask import Flask, render_template, request, redirect, url_for, session, flash
 from flask_wtf.csrf import CSRFProtect, CSRFError
+from flask_talisman import Talisman
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 import joblib
@@ -31,6 +32,14 @@ else:
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
 
+# stop the browser from caching pages so form submissions always hit the server
+@app.after_request
+def set_no_cache(response):
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
+
 # rate limiting - stops brute force attacks on login/signup and abuse of journal
 # uses the client's IP address to track how many requests they've made
 # if they go over the limit they get a 429 Too Many Requests error
@@ -45,16 +54,48 @@ limiter = Limiter(
 # csrf protection - every form gets a hidden token, rejects forged requests
 csrf = CSRFProtect(app)
 
+# check if we're on Render (production) or running locally
+is_production = os.environ.get('RENDER') is not None
+
 # secure session cookies - Layer 2 of our security stack
 # stops JS from reading the session cookie so XSS cant steal it
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 # only send cookie over HTTPS in production, allow HTTP for local dev
 # Render sets RENDER=true automatically so we know we're deployed
-app.config['SESSION_COOKIE_SECURE'] = os.environ.get('RENDER') is not None
+app.config['SESSION_COOKIE_SECURE'] = is_production
 # stops the browser from sending our cookie with cross-site requests
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 # session lasts 7 days before the user has to log in again
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)
+
+# content security policy - Layer 1 of our security stack
+# tells the browser which sources are allowed for scripts, styles, fonts etc
+# anything not on this whitelist gets blocked even if an attacker injects it
+# using nonces for scripts so only our tagged script blocks run
+csp = {
+    'default-src': "'self'",
+    'script-src': "'self'",
+    'style-src': "'self' 'unsafe-inline' https://fonts.googleapis.com",
+    'font-src': "'self' https://fonts.gstatic.com",
+    'img-src': "'self' data:",
+    'connect-src': "'self'",
+    'frame-ancestors': "'none'",
+    'base-uri': "'self'",
+    'form-action': "'self'",
+}
+
+# talisman sets the CSP header on every response and forces HTTPS in production
+# it also makes a random nonce per request that we put on script tags
+# any script tag without the nonce gets blocked by the browser
+talisman = Talisman(
+    app,
+    force_https=is_production,
+    strict_transport_security=is_production,
+    session_cookie_secure=is_production,
+    session_cookie_http_only=True,
+    content_security_policy=csp,
+    content_security_policy_nonce_in=['script-src'],
+)
 
 # file paths
 BASE_DIR = os.path.dirname(__file__)
@@ -2181,13 +2222,15 @@ def get_alignment_state(user_id):
 
 def update_alignment_score(user_id, delta: int):
     # increase or reduce score but never below zero
+    # postgres uses GREATEST(), sqlite uses MAX() for comparing two values
+    clamp_fn = "GREATEST" if USE_POSTGRES else "MAX"
     conn = get_db_connection()
     try:
         cur = conn.cursor()
         cur.execute(
-            "UPDATE alignment_state "
-            "SET alignment_score = MAX(alignment_score + %s, 0) "
-            "WHERE user_id = %s;",
+            f"UPDATE alignment_state "
+            f"SET alignment_score = {clamp_fn}(alignment_score + %s, 0) "
+            f"WHERE user_id = %s;",
             (delta, user_id),
         )
         conn.commit()

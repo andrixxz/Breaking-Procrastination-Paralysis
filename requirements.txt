@@ -1,9 +1,11 @@
 flask
 flask-wtf
 flask-limiter
+flask-talisman
 joblib
 scikit-learn
 numpy
 psycopg2-binary
 python-dotenv
 bleach
+gunicorn

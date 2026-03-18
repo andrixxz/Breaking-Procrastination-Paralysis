@@ -126,7 +126,7 @@
 
 <!-- cursor glow -->
 <div class="cursor-glow" id="cursorGlow"></div>
-<script>
+<script nonce="{{ csp_nonce() }}">
 (function() {
     var glow = document.getElementById('cursorGlow');
     if (!glow || window.innerWidth < 768) return;

@@ -126,7 +126,7 @@
     <div class="cursor-spotlight" id="cursorSpotlight"></div>
     <div class="cursor-ripple" id="cursorRipple"></div>
 
-    <script>
+    <script nonce="{{ csp_nonce() }}">
     (function() {
         if (window.innerWidth < 768) return;
 
