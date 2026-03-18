@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Break It Down - Breaking Procrastination Paralysis</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500&family=Lora:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='calm.css') }}">
+</head>
+<body>
+<div class="page-wrapper">
+
+    <nav class="page-nav">
+        <a href="{{ url_for('dashboard') }}" class="nav-brand">Breaking Procrastination Paralysis</a>
+        <ul class="nav-links">
+            <li><a href="{{ url_for('today') }}">Today</a></li>
+            <li><a href="{{ url_for('journal') }}">Reflect</a></li>
+            <li><a href="{{ url_for('habits') }}">Tiny Steps</a></li>
+            <li><a href="{{ url_for('goals_page') }}" class="active">Intentions</a></li>
+            <li><a href="{{ url_for('week') }}">Week</a></li>
+            <li><a href="{{ url_for('month') }}">Month</a></li>
+            <li><a href="{{ url_for('analytics') }}">Patterns</a></li>
+            <li><a href="{{ url_for('learn') }}">Learn</a></li>
+            <li><a href="{{ url_for('logout') }}" class="logout-link">Log out</a></li>
+        </ul>
+    </nav>
+
+    <main class="page-content stagger-children">
+
+        <div class="section-header fade-in-up">
+            <h1 class="section-title">Break it down</h1>
+            <p class="section-subtitle">
+                Big intentions become real when you turn them into small steps.<br>
+                Each step should feel doable in a few minutes.
+            </p>
+        </div>
+
+        <details class="psych-explainer fade-in-up" style="margin-bottom: var(--space-md);">
+            <summary>Why this works</summary>
+            <p>Large goals trigger avoidance because your brain sees them as threats. Breaking them into tiny pieces removes the threat. Each small step is easy enough that your brain does not resist it.</p>
+        </details>
+
+        {% if error_message %}
+        <div class="validation-message fade-in-up">
+            <p>{{ error_message }}</p>
+        </div>
+        {% endif %}
+
+        {% if step_done %}
+        <div class="win-card fade-in-up">
+            <p class="win-card-text">One step forward. That counts.</p>
+        </div>
+        {% endif %}
+
+        {% if step_deleted %}
+        <div class="card fade-in-up" style="text-align: center; padding: 16px;">
+            <p style="color: var(--text-secondary); margin: 0;">Step removed.</p>
+        </div>
+        {% endif %}
+
+        {% if goals %}
+            {% for goal in goals %}
+            <div class="card goal-breakdown-card fade-in-up">
+
+                <div class="goal-breakdown-header">
+                    <h2 class="goal-breakdown-title">{{ goal.goal_text }}</h2>
+                    {% if beliefs_map.get(goal.id) %}
+                    <p class="goal-breakdown-belief">&ldquo;{{ beliefs_map[goal.id] }}&rdquo;</p>
+                    {% endif %}
+                </div>
+
+                {% set steps = steps_by_goal.get(goal.id, []) %}
+
+                {% if steps %}
+                <ul class="goal-steps-list">
+                    {% for step in steps %}
+                    <li class="goal-step-item {% if step.is_completed_today %}goal-step-done{% endif %}">
+                        <div class="goal-step-left">
+                            <form method="post" action="{{ url_for('toggle_goal_step', step_id=step.id) }}" class="goal-step-check-form">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                <button type="submit" class="goal-step-checkbox {% if step.is_completed_today %}checked{% endif %}" aria-label="Toggle step">
+                                    {% if step.is_completed_today %}
+                                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7L5.5 10.5L12 3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                    {% endif %}
+                                </button>
+                            </form>
+                            <div class="goal-step-content">
+                                <span class="goal-step-text {% if step.is_completed_today %}text-done{% endif %}">{{ step.step_text }}</span>
+                                <div class="goal-step-meta">
+                                    <span class="step-frequency-badge {{ step.frequency }}">{{ step.frequency }}</span>
+                                    {% if step.frequency == 'weekly' and step.day_of_week is not none %}
+                                    <span class="step-day-badge">{{ ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][step.day_of_week] }}</span>
+                                    {% endif %}
+                                    {% if step.due_date %}
+                                    <span class="step-due-date">Due: {{ step.due_date }}</span>
+                                    {% endif %}
+                                    {% if step.frequency in ('daily', 'weekly') %}
+                                    <span class="step-recurring-label">resets {{ step.frequency }}</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="goal-step-actions">
+                            <button type="button" class="step-edit-btn" data-edit-step="{{ step.id }}" aria-label="Edit step">
+                                <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M10 1.5L12.5 4L4.5 12H2V9.5L10 1.5Z" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                            </button>
+                            <form method="post" action="{{ url_for('delete_goal_step', step_id=step.id) }}" class="step-delete-form">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                <button type="submit" class="step-delete-btn" aria-label="Delete step">
+                                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 4H12M5 4V2H9V4M5 6V11M9 6V11M3 4V12H11V4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                </button>
+                            </form>
+                        </div>
+                    </li>
+
+                    <!-- hidden edit form for this step -->
+                    <li class="goal-step-edit-row" id="edit-form-{{ step.id }}" style="display: none;">
+                        <form method="post" action="{{ url_for('edit_goal_step', step_id=step.id) }}" class="goal-step-edit-form">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                            <div class="step-edit-fields">
+                                <input type="text" name="step_text" value="{{ step.step_text }}" class="step-edit-input" maxlength="500" required>
+                                <div class="step-edit-options">
+                                    <select name="frequency" class="step-edit-select" data-toggle-fields="edit-{{ step.id }}">
+                                        <option value="daily" {% if step.frequency == 'daily' %}selected{% endif %}>Daily</option>
+                                        <option value="weekly" {% if step.frequency == 'weekly' %}selected{% endif %}>Weekly</option>
+                                        <option value="one-off" {% if step.frequency == 'one-off' %}selected{% endif %}>One-off</option>
+                                    </select>
+                                    <select name="day_of_week" class="step-edit-select step-dow-select" id="dow-edit-{{ step.id }}" style="{% if step.frequency != 'weekly' %}display:none;{% endif %}">
+                                        <option value="0" {% if step.day_of_week == 0 %}selected{% endif %}>Monday</option>
+                                        <option value="1" {% if step.day_of_week == 1 %}selected{% endif %}>Tuesday</option>
+                                        <option value="2" {% if step.day_of_week == 2 %}selected{% endif %}>Wednesday</option>
+                                        <option value="3" {% if step.day_of_week == 3 %}selected{% endif %}>Thursday</option>
+                                        <option value="4" {% if step.day_of_week == 4 %}selected{% endif %}>Friday</option>
+                                        <option value="5" {% if step.day_of_week == 5 %}selected{% endif %}>Saturday</option>
+                                        <option value="6" {% if step.day_of_week == 6 %}selected{% endif %}>Sunday</option>
+                                    </select>
+                                    <input type="date" name="due_date" value="{{ step.due_date or '' }}" class="step-edit-date" id="date-edit-{{ step.id }}" style="{% if step.frequency != 'one-off' %}display:none;{% endif %}">
+                                    <button type="submit" class="step-save-btn">Save</button>
+                                    <button type="button" class="step-cancel-btn" data-edit-step="{{ step.id }}">Cancel</button>
+                                </div>
+                            </div>
+                        </form>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p class="goal-steps-empty">No steps yet. Add one below to get started.</p>
+                {% endif %}
+
+                <!-- add step form -->
+                <div class="goal-step-add">
+                    <form method="post" action="{{ url_for('add_goal_step') }}" class="goal-step-add-form">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                        <input type="hidden" name="goal_id" value="{{ goal.id }}">
+                        <div class="step-add-row">
+                            <input type="text" name="step_text" placeholder="Add a small step..." class="step-add-input" maxlength="500" required>
+                        </div>
+                        <div class="step-add-options">
+                            <select name="frequency" class="step-add-select" data-toggle-fields="add-{{ goal.id }}">
+                                <option value="one-off">One-off</option>
+                                <option value="daily">Daily</option>
+                                <option value="weekly">Weekly</option>
+                            </select>
+                            <select name="day_of_week" class="step-add-select step-dow-select" id="dow-add-{{ goal.id }}" style="display:none;">
+                                <option value="0">Monday</option>
+                                <option value="1">Tuesday</option>
+                                <option value="2">Wednesday</option>
+                                <option value="3">Thursday</option>
+                                <option value="4">Friday</option>
+                                <option value="5">Saturday</option>
+                                <option value="6">Sunday</option>
+                            </select>
+                            <input type="date" name="due_date" class="step-add-date" id="date-add-{{ goal.id }}" placeholder="Due date (optional)">
+                            <button type="submit" class="btn-calm btn-calm-sm">Add step</button>
+                        </div>
+                    </form>
+                </div>
+
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="card fade-in-up" style="text-align: center; padding: 32px;">
+                <p style="color: var(--text-secondary);">You have not set any intentions yet.</p>
+                <a href="{{ url_for('onboarding_goals') }}" class="btn-calm" style="margin-top: 16px; display: inline-block;">Set your intentions</a>
+            </div>
+        {% endif %}
+
+        <a href="{{ url_for('dashboard') }}" class="btn-text" style="display: block; text-align: center; margin-top: var(--space-md);">
+            Back to Dashboard
+        </a>
+
+    </main>
+
+</div>
+
+<div class="cursor-glow" id="cursorGlow"></div>
+<script nonce="{{ csp_nonce() }}">
+(function() {
+    var glow = document.getElementById('cursorGlow');
+    if (!glow || window.innerWidth < 768) return;
+
+    var mouseX = -300, mouseY = -300;
+    var glowX = -300, glowY = -300;
+
+    document.addEventListener('mousemove', function(e) {
+        mouseX = e.clientX;
+        mouseY = e.clientY;
+    });
+
+    function animate() {
+        glowX += (mouseX - glowX) * 0.12;
+        glowY += (mouseY - glowY) * 0.12;
+        glow.style.left = glowX + 'px';
+        glow.style.top = glowY + 'px';
+        requestAnimationFrame(animate);
+    }
+    animate();
+})();
+
+// show or hide the edit form for a step
+function toggleEditForm(stepId) {
+    var form = document.getElementById('edit-form-' + stepId);
+    if (form.style.display === 'none') {
+        form.style.display = 'list-item';
+    } else {
+        form.style.display = 'none';
+    }
+}
+
+// show/hide the day-of-week or due-date fields based on frequency
+function toggleStepFields(selectEl, suffix) {
+    var freq = selectEl.value;
+    var dowEl = document.getElementById('dow-' + suffix);
+    var dateEl = document.getElementById('date-' + suffix);
+    if (dowEl) {
+        dowEl.style.display = (freq === 'weekly') ? 'inline-block' : 'none';
+    }
+    if (dateEl) {
+        dateEl.style.display = (freq === 'one-off') ? 'inline-block' : 'none';
+    }
+}
+
+// hook up edit/cancel buttons (moved from inline onclick for CSP)
+document.querySelectorAll('[data-edit-step]').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+        toggleEditForm(btn.getAttribute('data-edit-step'));
+    });
+});
+
+// hook up frequency selects (moved from inline onchange for CSP)
+document.querySelectorAll('[data-toggle-fields]').forEach(function(sel) {
+    sel.addEventListener('change', function() {
+        toggleStepFields(sel, sel.getAttribute('data-toggle-fields'));
+    });
+});
+</script>
+</body>
+</html>

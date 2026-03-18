@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Break It Down - Breaking Procrastination Paralysis</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500&family=Lora:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='calm.css') }}">
+</head>
+
+<body>
+<div class="page-wrapper">
+
+    <main class="page-content" style="max-width: 700px; margin: 0 auto; padding-top: 60px;">
+
+        <!-- Progress Indicator -->
+        <div style="text-align: center; margin-bottom: 40px;">
+            <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 8px;">
+                Step {{ step }} of {{ total_steps }}
+            </p>
+            <div style="width: 100%; height: 6px; background: var(--bg-secondary); border-radius: 3px; overflow: hidden;">
+                <div style="width: {{ (step / total_steps) * 100 }}%; height: 100%; background: var(--sage-green); transition: width 0.4s;"></div>
+            </div>
+        </div>
+
+        <div class="section-header fade-in-up">
+            <h1 class="section-title">Break it down</h1>
+            <p class="section-subtitle">
+                Big intentions become real when you turn them into small steps.<br>
+                Each step should feel doable in a few minutes. You can always add more later.
+            </p>
+        </div>
+
+        <details class="psych-explainer fade-in-up" style="margin-bottom: 24px;">
+            <summary>Why this works</summary>
+            <p>Large goals trigger avoidance because your brain sees them as threats. Breaking them into tiny pieces removes the threat. Each small step is easy enough that your brain does not resist it.</p>
+        </details>
+
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+            <div class="auth-flash" style="margin-bottom: 24px;">
+                {% for message in messages %}
+                <p>{{ message }}</p>
+                {% endfor %}
+            </div>
+            {% endif %}
+        {% endwith %}
+
+        <form method="post" class="fade-in-up">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+
+            {% for goal in goals %}
+            <div class="card" style="margin-bottom: 24px; padding: 24px;">
+                <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 16px;">
+                    <strong>Breaking down:</strong> {{ goal.goal_text }}
+                </p>
+
+                {% for i in range(1, 4) %}
+                {% set step_data = existing_steps.get(goal.id, {}).get(i, {}) %}
+                <div class="form-group" style="margin-bottom: 12px;">
+                    <label for="step_{{ goal.id }}_{{ i }}" class="form-label" style="font-size: 0.85rem;">
+                        Step {{ i }}{% if i == 1 %} <span style="color: var(--text-muted);">(at least one required)</span>{% else %} <span style="color: var(--text-muted);">(optional)</span>{% endif %}
+                    </label>
+                    <input
+                        type="text"
+                        id="step_{{ goal.id }}_{{ i }}"
+                        name="step_{{ goal.id }}_{{ i }}"
+                        value="{{ step_data.get('text', '') }}"
+                        maxlength="500"
+                        placeholder="{% if i == 1 %}E.g., Open the document and read the first paragraph{% elif i == 2 %}E.g., Write one sentence about what I read{% else %}E.g., Save and close - done for today{% endif %}"
+                        style="width: 100%; padding: 10px 14px; border: 1px solid rgba(0,0,0,0.1); border-radius: var(--radius-md); font-size: 0.9rem; font-family: inherit; background: var(--cream, #FFFAF5); color: var(--text-primary); box-sizing: border-box;"
+                    >
+                    <div style="margin-top: 6px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                        <select
+                            name="freq_{{ goal.id }}_{{ i }}"
+                            style="padding: 6px 10px; border: 1px solid rgba(0,0,0,0.1); border-radius: var(--radius-md); font-size: 0.8rem; font-family: inherit; background: white; color: var(--text-primary);"
+                            data-toggle-dow="{{ goal.id }}_{{ i }}"
+                        >
+                            <option value="daily" {% if step_data.get('frequency') == 'daily' %}selected{% endif %}>Daily</option>
+                            <option value="weekly" {% if step_data.get('frequency') == 'weekly' %}selected{% endif %}>Weekly</option>
+                            <option value="one-off" {% if step_data.get('frequency', 'one-off') == 'one-off' %}selected{% endif %}>One-off</option>
+                        </select>
+                        <select
+                            name="dow_{{ goal.id }}_{{ i }}"
+                            id="dow-{{ goal.id }}_{{ i }}"
+                            style="padding: 6px 10px; border: 1px solid rgba(0,0,0,0.1); border-radius: var(--radius-md); font-size: 0.8rem; font-family: inherit; background: white; color: var(--text-primary); {% if step_data.get('frequency') != 'weekly' %}display: none;{% endif %}"
+                        >
+                            <option value="0" {% if step_data.get('day_of_week') == 0 %}selected{% endif %}>Monday</option>
+                            <option value="1" {% if step_data.get('day_of_week') == 1 %}selected{% endif %}>Tuesday</option>
+                            <option value="2" {% if step_data.get('day_of_week') == 2 %}selected{% endif %}>Wednesday</option>
+                            <option value="3" {% if step_data.get('day_of_week') == 3 %}selected{% endif %}>Thursday</option>
+                            <option value="4" {% if step_data.get('day_of_week') == 4 %}selected{% endif %}>Friday</option>
+                            <option value="5" {% if step_data.get('day_of_week') == 5 %}selected{% endif %}>Saturday</option>
+                            <option value="6" {% if step_data.get('day_of_week') == 6 %}selected{% endif %}>Sunday</option>
+                        </select>
+                    </div>
+                </div>
+                {% endfor %}
+
+                <!-- extra steps hidden by default, shown with JS -->
+                <div id="extra-steps-{{ goal.id }}" style="display: none;">
+                    {% for i in range(4, 6) %}
+                    {% set step_data = existing_steps.get(goal.id, {}).get(i, {}) %}
+                    <div class="form-group" style="margin-bottom: 12px;">
+                        <label for="step_{{ goal.id }}_{{ i }}" class="form-label" style="font-size: 0.85rem;">
+                            Step {{ i }} <span style="color: var(--text-muted);">(optional)</span>
+                        </label>
+                        <input
+                            type="text"
+                            id="step_{{ goal.id }}_{{ i }}"
+                            name="step_{{ goal.id }}_{{ i }}"
+                            value="{{ step_data.get('text', '') }}"
+                            maxlength="500"
+                            placeholder="Another small step..."
+                            style="width: 100%; padding: 10px 14px; border: 1px solid rgba(0,0,0,0.1); border-radius: var(--radius-md); font-size: 0.9rem; font-family: inherit; background: var(--cream, #FFFAF5); color: var(--text-primary); box-sizing: border-box;"
+                        >
+                        <div style="margin-top: 6px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                            <select
+                                name="freq_{{ goal.id }}_{{ i }}"
+                                style="padding: 6px 10px; border: 1px solid rgba(0,0,0,0.1); border-radius: var(--radius-md); font-size: 0.8rem; font-family: inherit; background: white; color: var(--text-primary);"
+                                data-toggle-dow="{{ goal.id }}_{{ i }}"
+                            >
+                                <option value="daily" {% if step_data.get('frequency') == 'daily' %}selected{% endif %}>Daily</option>
+                                <option value="weekly" {% if step_data.get('frequency') == 'weekly' %}selected{% endif %}>Weekly</option>
+                                <option value="one-off" {% if step_data.get('frequency', 'one-off') == 'one-off' %}selected{% endif %}>One-off</option>
+                            </select>
+                            <select
+                                name="dow_{{ goal.id }}_{{ i }}"
+                                id="dow-{{ goal.id }}_{{ i }}"
+                                style="padding: 6px 10px; border: 1px solid rgba(0,0,0,0.1); border-radius: var(--radius-md); font-size: 0.8rem; font-family: inherit; background: white; color: var(--text-primary); {% if step_data.get('frequency') != 'weekly' %}display: none;{% endif %}"
+                            >
+                                <option value="0" {% if step_data.get('day_of_week') == 0 %}selected{% endif %}>Monday</option>
+                                <option value="1" {% if step_data.get('day_of_week') == 1 %}selected{% endif %}>Tuesday</option>
+                                <option value="2" {% if step_data.get('day_of_week') == 2 %}selected{% endif %}>Wednesday</option>
+                                <option value="3" {% if step_data.get('day_of_week') == 3 %}selected{% endif %}>Thursday</option>
+                                <option value="4" {% if step_data.get('day_of_week') == 4 %}selected{% endif %}>Friday</option>
+                                <option value="5" {% if step_data.get('day_of_week') == 5 %}selected{% endif %}>Saturday</option>
+                                <option value="6" {% if step_data.get('day_of_week') == 6 %}selected{% endif %}>Sunday</option>
+                            </select>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <button type="button" class="btn-text" style="font-size: 0.85rem; margin-top: 4px;" data-toggle-extra="{{ goal.id }}">
+                    + Add more steps
+                </button>
+
+            </div>
+            {% endfor %}
+
+            <button type="submit" class="btn-calm" style="width: 100%; margin-top: 16px;">
+                Start your journey
+            </button>
+
+            <a href="{{ url_for('onboarding_habits') }}" class="btn-text" style="display: block; text-align: center; margin-top: 12px;">
+                Back to Habits
+            </a>
+
+        </form>
+
+    </main>
+
+</div>
+
+<div class="cursor-glow" id="cursorGlow"></div>
+<script nonce="{{ csp_nonce() }}">
+(function() {
+    var glow = document.getElementById('cursorGlow');
+    if (!glow || window.innerWidth < 768) return;
+
+    var mouseX = -300, mouseY = -300;
+    var glowX = -300, glowY = -300;
+
+    document.addEventListener('mousemove', function(e) {
+        mouseX = e.clientX;
+        mouseY = e.clientY;
+    });
+
+    function animate() {
+        glowX += (mouseX - glowX) * 0.12;
+        glowY += (mouseY - glowY) * 0.12;
+        glow.style.left = glowX + 'px';
+        glow.style.top = glowY + 'px';
+        requestAnimationFrame(animate);
+    }
+    animate();
+})();
+
+// show or hide the extra step fields for a goal
+function toggleExtra(goalId, btn) {
+    var el = document.getElementById('extra-steps-' + goalId);
+    if (el.style.display === 'none') {
+        el.style.display = 'block';
+        btn.textContent = '- Fewer steps';
+    } else {
+        el.style.display = 'none';
+        btn.textContent = '+ Add more steps';
+    }
+}
+
+// show day-of-week dropdown when weekly is picked
+function toggleOnboardingDow(selectEl, suffix) {
+    var dowEl = document.getElementById('dow-' + suffix);
+    if (dowEl) {
+        dowEl.style.display = (selectEl.value === 'weekly') ? 'inline-block' : 'none';
+    }
+}
+
+// hook up frequency selects to show/hide day-of-week (moved from inline onchange for CSP)
+document.querySelectorAll('[data-toggle-dow]').forEach(function(sel) {
+    sel.addEventListener('change', function() {
+        toggleOnboardingDow(sel, sel.getAttribute('data-toggle-dow'));
+    });
+});
+
+// hook up the add-more-steps buttons (moved from inline onclick for CSP)
+document.querySelectorAll('[data-toggle-extra]').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+        toggleExtra(btn.getAttribute('data-toggle-extra'), btn);
+    });
+});
+</script>
+</body>
+</html>

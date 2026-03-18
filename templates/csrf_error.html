@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Form Expired</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <!-- fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500&family=Lora:ital,wght@0,400;0,500;1,400&display=swap"
+        rel="stylesheet"
+    >
+
+    <!-- design system -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='calm.css') }}">
+</head>
+
+<body>
+<div class="page-wrapper" style="display: flex; justify-content: center; align-items: center; min-height: 100vh;">
+    <main class="main-content" style="max-width: 500px; text-align: center;">
+        <div class="card fade-in-up" style="padding: 48px 32px;">
+            <h1 style="font-size: 1.4rem; margin-bottom: 16px; color: var(--text-primary);">Your form has expired</h1>
+            <p style="color: var(--text-secondary); margin-bottom: 8px;">
+                This can happen if you left the page open for a while, or if your session ended.
+            </p>
+            <p style="color: var(--text-secondary); margin-bottom: 24px;">
+                Nothing was lost. Just go back and try again.
+            </p>
+            <a href="javascript:history.back()" class="btn-calm" style="display: inline-block;">Go back</a>
+            <p style="margin-top: 16px;">
+                <a href="{{ url_for('dashboard') }}" class="btn-text">Or return to your dashboard</a>
+            </p>
+        </div>
+    </main>
+</div>
+</body>
+</html>

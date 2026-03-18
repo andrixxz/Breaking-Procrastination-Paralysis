@@ -1,0 +1,477 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>How This Works - Breaking Procrastination Paralysis</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <!-- fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500&family=Lora:ital,wght@0,400;0,500;1,400&display=swap"
+        rel="stylesheet"
+    >
+
+    <!-- design system -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='calm.css') }}">
+</head>
+
+<body>
+<div class="page-wrapper">
+
+    <!-- navigation -->
+    <nav class="page-nav">
+        <a href="{{ url_for('dashboard') }}" class="nav-brand">Breaking Procrastination Paralysis</a>
+        <ul class="nav-links">
+            <li><a href="{{ url_for('today') }}">Today</a></li>
+            <li><a href="{{ url_for('journal') }}">Reflect</a></li>
+            <li><a href="{{ url_for('habits') }}">Tiny Steps</a></li>
+            <li><a href="{{ url_for('goals_page') }}">Intentions</a></li>
+            <li><a href="{{ url_for('week') }}">Week</a></li>
+            <li><a href="{{ url_for('month') }}">Month</a></li>
+            <li><a href="{{ url_for('analytics') }}">Patterns</a></li>
+            <li><a href="{{ url_for('learn') }}" class="active">Learn</a></li>
+            <li><a href="{{ url_for('logout') }}" class="logout-link">Log out</a></li>
+        </ul>
+    </nav>
+
+    <!-- main content -->
+    <main class="page-content stagger-children">
+
+        <!-- page header -->
+        <div class="learn-header">
+            <h1 class="learn-title">How This Works</h1>
+            <p class="learn-subtitle">Every feature in this app is built on real psychology research. Here is the science behind why it works.</p>
+        </div>
+
+        <!-- enhanced feature-to-research visual map (Task 4.2) -->
+        <div class="learn-map">
+            <h2 class="learn-map-title">What you see in the app and why it is there</h2>
+            <p class="learn-map-intro">Every feature maps to a real psychological principle. Click any one to jump to the full explanation below.</p>
+
+            <!-- stage flow - shows the 3-stage cycle the app is built on -->
+            <div class="learn-map-flow">
+                <div class="learn-map-flow-stage">
+                    <span class="learn-map-flow-dot"></span>
+                    <span class="learn-map-flow-label">Awareness</span>
+                </div>
+                <span class="learn-map-flow-connector"></span>
+                <div class="learn-map-flow-stage">
+                    <span class="learn-map-flow-dot"></span>
+                    <span class="learn-map-flow-label">Alignment</span>
+                </div>
+                <span class="learn-map-flow-connector"></span>
+                <div class="learn-map-flow-stage">
+                    <span class="learn-map-flow-dot"></span>
+                    <span class="learn-map-flow-label">Action</span>
+                </div>
+            </div>
+
+            <!-- features grouped by their psychological stage -->
+            <div class="learn-map-groups">
+
+                <!-- awareness - recognising what is happening -->
+                <div class="learn-map-group">
+                    <div class="learn-map-group-header">
+                        <h3 class="learn-map-group-label">Awareness</h3>
+                        <p class="learn-map-group-desc">Recognising what is happening inside you</p>
+                    </div>
+
+                    <div class="learn-map-group-items">
+                        <button type="button" class="learn-map-item" data-scroll-to="learn-card-10">
+                            <div class="learn-map-item-top">
+                                <span class="learn-map-feature">Journal</span>
+                                <span class="learn-map-arrow">&rarr;</span>
+                                <span class="learn-map-research">Affect labelling + prefrontal cortex activation</span>
+                            </div>
+                            <span class="learn-map-explain">Writing how you feel activates the part of your brain that calms the avoidance response.</span>
+                        </button>
+
+                        <button type="button" class="learn-map-item" data-scroll-to="learn-card-2">
+                            <div class="learn-map-item-top">
+                                <span class="learn-map-feature">Breathing prompt</span>
+                                <span class="learn-map-arrow">&rarr;</span>
+                                <span class="learn-map-research">Parasympathetic nervous system activation</span>
+                            </div>
+                            <span class="learn-map-explain">A slow breath calms your nervous system so your thinking brain can come back online.</span>
+                        </button>
+
+                        <button type="button" class="learn-map-item" data-scroll-to="learn-card-1">
+                            <div class="learn-map-item-top">
+                                <span class="learn-map-feature">Emotion detection</span>
+                                <span class="learn-map-arrow">&rarr;</span>
+                                <span class="learn-map-research">Mindfulness loop completion</span>
+                            </div>
+                            <span class="learn-map-explain">The ML model names what you are feeling, completing the awareness loop.</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- alignment - connecting to identity -->
+                <div class="learn-map-group">
+                    <div class="learn-map-group-header">
+                        <h3 class="learn-map-group-label">Alignment</h3>
+                        <p class="learn-map-group-desc">Connecting to who you are becoming</p>
+                    </div>
+
+                    <div class="learn-map-group-items">
+                        <button type="button" class="learn-map-item" data-scroll-to="learn-card-3">
+                            <div class="learn-map-item-top">
+                                <span class="learn-map-feature">Identity beliefs</span>
+                                <span class="learn-map-arrow">&rarr;</span>
+                                <span class="learn-map-research">Neuroplasticity + confirmation bias reprogramming</span>
+                            </div>
+                            <span class="learn-map-explain">Rewriting intentions as "I am" statements shifts what your brain looks for as evidence.</span>
+                        </button>
+
+                        <button type="button" class="learn-map-item" data-scroll-to="learn-card-6">
+                            <div class="learn-map-item-top">
+                                <span class="learn-map-feature">Reframes</span>
+                                <span class="learn-map-arrow">&rarr;</span>
+                                <span class="learn-map-research">Cognitive behavioural therapy technique</span>
+                            </div>
+                            <span class="learn-map-explain">A gentler perspective acknowledges the emotion first, then shows another way to see it.</span>
+                        </button>
+
+                        <button type="button" class="learn-map-item" data-scroll-to="learn-card-9">
+                            <div class="learn-map-item-top">
+                                <span class="learn-map-feature">Alignment score</span>
+                                <span class="learn-map-arrow">&rarr;</span>
+                                <span class="learn-map-research">Self-efficacy evidence accumulation</span>
+                            </div>
+                            <span class="learn-map-explain">Each action you take is counted as evidence of who you are becoming.</span>
+                        </button>
+
+                        <button type="button" class="learn-map-item" data-scroll-to="learn-card-5">
+                            <div class="learn-map-item-top">
+                                <span class="learn-map-feature">Streak</span>
+                                <span class="learn-map-arrow">&rarr;</span>
+                                <span class="learn-map-research">Neuroplasticity pathway strengthening tracker</span>
+                            </div>
+                            <span class="learn-map-explain">Each consecutive day strengthens the neural pathway for your new identity.</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- action - taking one small step -->
+                <div class="learn-map-group">
+                    <div class="learn-map-group-header">
+                        <h3 class="learn-map-group-label">Action</h3>
+                        <p class="learn-map-group-desc">Taking one small step forward</p>
+                    </div>
+
+                    <div class="learn-map-group-items">
+                        <button type="button" class="learn-map-item" data-scroll-to="learn-card-7">
+                            <div class="learn-map-item-top">
+                                <span class="learn-map-feature">Tiny actions</span>
+                                <span class="learn-map-arrow">&rarr;</span>
+                                <span class="learn-map-research">Behavioural activation intervention</span>
+                            </div>
+                            <span class="learn-map-explain">One small step is small enough that your brain does not register it as a threat.</span>
+                        </button>
+
+                        <button type="button" class="learn-map-item" data-scroll-to="learn-card-4">
+                            <div class="learn-map-item-top">
+                                <span class="learn-map-feature">Habits</span>
+                                <span class="learn-map-arrow">&rarr;</span>
+                                <span class="learn-map-research">Identity-congruent behaviour repetition</span>
+                            </div>
+                            <span class="learn-map-explain">Repeating identity-aligned actions trains your brain to see them as normal.</span>
+                        </button>
+
+                        <button type="button" class="learn-map-item" data-scroll-to="learn-card-8">
+                            <div class="learn-map-item-top">
+                                <span class="learn-map-feature">One action (not a list)</span>
+                                <span class="learn-map-arrow">&rarr;</span>
+                                <span class="learn-map-research">Decision fatigue reduction</span>
+                            </div>
+                            <span class="learn-map-explain">Returning one action instead of a list removes the decision about where to start.</span>
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- psychology cards -->
+        <div class="learn-cards">
+
+            <!-- Card 1: Procrastination is not laziness -->
+            <div class="learn-card" id="learn-card-1">
+                <button type="button" class="learn-card-toggle" aria-expanded="false">
+                    <span class="learn-card-number">01</span>
+                    <h3 class="learn-card-title">Why procrastination is not laziness</h3>
+                    <span class="learn-card-icon">+</span>
+                </button>
+                <div class="learn-card-body" hidden>
+                    <p>Procrastination is not about being lazy or bad at managing time. It is an emotional response. When a task feels overwhelming, boring, or tied to fear of failure, your brain triggers an avoidance response to protect you from discomfort. The part of your brain that processes threats (the amygdala) hijacks the part that plans and makes decisions (the prefrontal cortex). You are not choosing to avoid the task. Your nervous system is doing it for you.</p>
+                    <p class="learn-card-link">This is why the app starts with how you feel, not what you need to do.</p>
+                    <p class="learn-card-citation">PLACEHOLDER FOR REFERENCES</p>
+                </div>
+            </div>
+
+            <!-- Card 2: Freeze response -->
+            <div class="learn-card" id="learn-card-2">
+                <button type="button" class="learn-card-toggle" aria-expanded="false">
+                    <span class="learn-card-number">02</span>
+                    <h3 class="learn-card-title">What happens in your brain when you freeze</h3>
+                    <span class="learn-card-icon">+</span>
+                </button>
+                <div class="learn-card-body" hidden>
+                    <p>When you sit down to work and feel that wave of paralysis, that is your fight-or-flight system activating. Your amygdala detects the task as a threat and floods your body with stress hormones. Your prefrontal cortex (the part responsible for planning, focus, and decision-making) goes offline. You are not thinking clearly because your brain has literally shifted into survival mode. The freeze response is the third option after fight or flight. You are not broken. Your brain is trying to keep you safe.</p>
+                    <p class="learn-card-link">This is why the breathing prompt appears before the journal. A slow breath activates your parasympathetic nervous system, which calms the stress response and brings your prefrontal cortex back online.</p>
+                    <p class="learn-card-citation">PLACEHOLDER FOR REFERENCES</p>
+                </div>
+            </div>
+
+            <!-- Card 3: Identity beliefs -->
+            <div class="learn-card" id="learn-card-3">
+                <button type="button" class="learn-card-toggle" aria-expanded="false">
+                    <span class="learn-card-number">03</span>
+                    <h3 class="learn-card-title">How identity beliefs change your behaviour</h3>
+                    <span class="learn-card-icon">+</span>
+                </button>
+                <div class="learn-card-body" hidden>
+                    <p>Most habit systems start with goals: "I want to exercise three times a week." But goals describe outcomes, not who you are. Identity-based habit formation flips this. Instead of "I want to exercise," you start with "I am someone who moves their body." When you believe something about yourself, you naturally act in ways that match that belief. Every tiny action you complete becomes evidence that this new belief is true. Over time, the belief becomes automatic.</p>
+                    <p class="learn-card-link">This is why onboarding asks you to rewrite your intentions as "I am" statements. The app turns every completed action into identity evidence.</p>
+                    <p class="learn-card-citation">PLACEHOLDER FOR REFERENCES</p>
+                </div>
+            </div>
+
+            <!-- Card 4: Confirmation bias / RAS -->
+            <div class="learn-card" id="learn-card-4">
+                <button type="button" class="learn-card-toggle" aria-expanded="false">
+                    <span class="learn-card-number">04</span>
+                    <h3 class="learn-card-title">Why your brain filters what you notice</h3>
+                    <span class="learn-card-icon">+</span>
+                </button>
+                <div class="learn-card-body" hidden>
+                    <p>Your brain processes millions of bits of information every second, but you can only be aware of a tiny fraction. The reticular activating system (RAS) acts like a filter, deciding what gets through. It prioritises information that matches your existing beliefs. If you believe "I never finish things," your brain will notice every unfinished task and ignore every time you did follow through. This is called confirmation bias. The good news is that it works both ways. If you start telling yourself "I am someone who starts tasks gently," your RAS will begin filtering for evidence that supports that instead.</p>
+                    <p class="learn-card-link">This is why the dashboard shows you a daily identity reminder. Repeated exposure trains your RAS to look for evidence that your new belief is true.</p>
+                    <p class="learn-card-citation">PLACEHOLDER FOR REFERENCES</p>
+                </div>
+            </div>
+
+            <!-- Card 5: Neuroplasticity -->
+            <div class="learn-card" id="learn-card-5">
+                <button type="button" class="learn-card-toggle" aria-expanded="false">
+                    <span class="learn-card-number">05</span>
+                    <h3 class="learn-card-title">How repetition rewires your brain</h3>
+                    <span class="learn-card-icon">+</span>
+                </button>
+                <div class="learn-card-body" hidden>
+                    <p>Your brain is not fixed. Every time you repeat an action, the neural pathway for that action gets stronger. This is neuroplasticity. Think of it like walking through a field of tall grass. The first time, you have to push through. The tenth time, there is a visible trail. The hundredth time, it is a clear path. Each day you show up and journal, complete a tiny action, or check in with how you are feeling, you are strengthening the pathway for that behaviour. It gets easier not because the task changed but because your brain changed.</p>
+                    <p class="learn-card-link">This is why the app tracks consecutive days of showing up. Each day is a rep that makes the new pathway stronger.</p>
+                    <p class="learn-card-citation">PLACEHOLDER FOR REFERENCES</p>
+                </div>
+            </div>
+
+            <!-- Card 6: Cognitive reframing -->
+            <div class="learn-card" id="learn-card-6">
+                <button type="button" class="learn-card-toggle" aria-expanded="false">
+                    <span class="learn-card-number">06</span>
+                    <h3 class="learn-card-title">What cognitive reframing actually does</h3>
+                    <span class="learn-card-icon">+</span>
+                </button>
+                <div class="learn-card-body" hidden>
+                    <p>When you are stuck, your thoughts often follow distorted patterns. "I will never finish this" (all-or-nothing thinking). "Everyone else finds this easy" (comparison). "If I cannot do it perfectly, why bother" (perfectionism). These thought patterns feel like facts, but they are not. Cognitive reframing is a technique from cognitive behavioural therapy (CBT) that gently challenges the distortion and offers a more balanced perspective. It does not dismiss how you feel. It acknowledges the emotion first, then shows you that the thought behind it might not be the full picture.</p>
+                    <p class="learn-card-link">This is why the reframe after a journal entry always starts by naming what you are feeling before offering a different way to look at it.</p>
+                    <p class="learn-card-citation">PLACEHOLDER FOR REFERENCES</p>
+                </div>
+            </div>
+
+            <!-- Card 7: Tiny actions -->
+            <div class="learn-card" id="learn-card-7">
+                <button type="button" class="learn-card-toggle" aria-expanded="false">
+                    <span class="learn-card-number">07</span>
+                    <h3 class="learn-card-title">Why tiny actions work when big plans fail</h3>
+                    <span class="learn-card-icon">+</span>
+                </button>
+                <div class="learn-card-body" hidden>
+                    <p>When your brain is in freeze mode, it perceives big tasks as threats. Telling yourself to "write the whole essay" triggers the same avoidance response that caused the paralysis in the first place. But "open the document" does not. Tiny actions work because they are small enough that your brain does not register them as dangerous. Once you start, momentum often carries you further than you expected. Behavioural activation (a technique from clinical psychology) is based on this exact principle: action comes before motivation, not the other way around.</p>
+                    <p class="learn-card-link">This is why the app gives you one small action, never a list. The goal is to get you moving, not to plan the whole journey.</p>
+                    <p class="learn-card-citation">PLACEHOLDER FOR REFERENCES</p>
+                </div>
+            </div>
+
+            <!-- Card 8: Decision fatigue -->
+            <div class="learn-card" id="learn-card-8">
+                <button type="button" class="learn-card-toggle" aria-expanded="false">
+                    <span class="learn-card-number">08</span>
+                    <h3 class="learn-card-title">Why one app is better than five</h3>
+                    <span class="learn-card-icon">+</span>
+                </button>
+                <div class="learn-card-body" hidden>
+                    <p>Every decision you make uses mental energy. The more decisions you make in a day, the worse your subsequent decisions become. This is called decision fatigue. When someone who struggles with procrastination has to switch between a journal app, a todo app, a habit tracker, a calendar, and a mindfulness app, each switch costs energy. The act of deciding which tool to open can itself trigger avoidance. A single unified system removes that friction entirely. You open one app and everything is there.</p>
+                    <p class="learn-card-link">This is why this app combines journaling, habits, todos, intentions, and planning in one place. Fewer decisions means less friction.</p>
+                    <p class="learn-card-citation">PLACEHOLDER FOR REFERENCES</p>
+                </div>
+            </div>
+
+            <!-- Card 9: Small wins -->
+            <div class="learn-card" id="learn-card-9">
+                <button type="button" class="learn-card-toggle" aria-expanded="false">
+                    <span class="learn-card-number">09</span>
+                    <h3 class="learn-card-title">How small wins build self-belief</h3>
+                    <span class="learn-card-icon">+</span>
+                </button>
+                <div class="learn-card-body" hidden>
+                    <p>Self-efficacy is the belief that you can do something. It is different from self-esteem (believing you are worth something) and different from motivation (wanting to do something). The strongest way to build self-efficacy is through mastery experiences: actually doing the thing and succeeding. But the thing has to be small enough that success is realistic. Each time you complete a tiny action and the app names it as a win, your brain stores that as evidence. "I did it once, so I can do it again." Over time, these small wins stack up and your self-belief shifts.</p>
+                    <p class="learn-card-link">This is why the app says "That is evidence of who you are becoming" instead of "Great job." The win is framed as identity evidence, not just task completion.</p>
+                    <p class="learn-card-citation">PLACEHOLDER FOR REFERENCES</p>
+                </div>
+            </div>
+
+            <!-- Card 10: Affect labelling -->
+            <div class="learn-card" id="learn-card-10">
+                <button type="button" class="learn-card-toggle" aria-expanded="false">
+                    <span class="learn-card-number">10</span>
+                    <h3 class="learn-card-title">Why naming your feelings reduces their power</h3>
+                    <span class="learn-card-icon">+</span>
+                </button>
+                <div class="learn-card-body" hidden>
+                    <p>When you put a feeling into words, something measurable happens in your brain. fMRI studies show that labelling an emotion in language reduces activation in the amygdala (the brain's threat detector) and increases activation in the prefrontal cortex (the brain's planning centre). This is called affect labelling. You do not need to analyse the feeling or solve it. Just naming it is enough to take some of its power away. The emotion does not disappear, but it becomes easier to sit with.</p>
+                    <p class="learn-card-link">This is why the app says "It sounds like you might be feeling..." after you journal. The ML model names the emotion so your brain can start processing it.</p>
+                    <p class="learn-card-citation">PLACEHOLDER FOR REFERENCES</p>
+                </div>
+            </div>
+
+            <!-- Card 11: Motivation is not the answer -->
+            <div class="learn-card" id="learn-card-11">
+                <button type="button" class="learn-card-toggle" aria-expanded="false">
+                    <span class="learn-card-number">11</span>
+                    <h3 class="learn-card-title">Why motivation is not the answer</h3>
+                    <span class="learn-card-icon">+</span>
+                </button>
+                <div class="learn-card-body" hidden>
+                    <p>Motivation is unreliable. It comes and goes based on mood, sleep, stress, and a hundred other things you cannot control. Most productivity apps are designed for people who already have motivation and just need to organise it. But if you are stuck in procrastination paralysis, motivation is exactly what is missing. Telling someone who is frozen to "just get motivated" is like telling someone with a broken leg to "just walk." This app does not try to motivate you. It helps you feel safe enough to take one small step. Action creates motivation, not the other way around.</p>
+                    <p class="learn-card-link">This is why the app never uses words like "push through" or "stay motivated." The tone is always gentle because pressure makes paralysis worse.</p>
+                    <p class="learn-card-citation">PLACEHOLDER FOR REFERENCES</p>
+                </div>
+            </div>
+
+            <!-- Card 12: New beliefs feel uncomfortable -->
+            <div class="learn-card" id="learn-card-12">
+                <button type="button" class="learn-card-toggle" aria-expanded="false">
+                    <span class="learn-card-number">12</span>
+                    <h3 class="learn-card-title">Why new beliefs feel uncomfortable at first</h3>
+                    <span class="learn-card-icon">+</span>
+                </button>
+                <div class="learn-card-body" hidden>
+                    <p>When you write "I am someone who starts tasks gently" but your brain screams "No you are not," that is completely normal. Your subconscious has spent years building a version of who you are based on past experiences. A new identity belief conflicts with that existing model, and the brain resists unfamiliar patterns. This is not a sign that the belief is wrong. It is a sign that it is new. Each time you act in a way that matches the new belief (even something tiny), your brain updates its model slightly. The discomfort fades as the new belief becomes familiar through repetition.</p>
+                    <p class="learn-card-link">This is why onboarding tells you that resistance is normal. The app does not pretend this is easy. It just keeps showing you evidence that the new belief is becoming true.</p>
+                    <p class="learn-card-citation">PLACEHOLDER FOR REFERENCES</p>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- back to dashboard -->
+        <div class="learn-footer">
+            <a href="{{ url_for('dashboard') }}" class="learn-back-link">&larr; Back to dashboard</a>
+        </div>
+
+    </main>
+
+</div>
+
+<!-- cursor glow effect -->
+<div class="cursor-glow" id="cursorGlow"></div>
+<script nonce="{{ csp_nonce() }}">
+(function() {
+    var glow = document.getElementById('cursorGlow');
+    if (!glow || window.innerWidth < 768) return;
+
+    var mouseX = -300, mouseY = -300;
+    var glowX = -300, glowY = -300;
+
+    document.addEventListener('mousemove', function(e) {
+        mouseX = e.clientX;
+        mouseY = e.clientY;
+    });
+
+    function animate() {
+        glowX += (mouseX - glowX) * 0.12;
+        glowY += (mouseY - glowY) * 0.12;
+        glow.style.left = glowX + 'px';
+        glow.style.top = glowY + 'px';
+        requestAnimationFrame(animate);
+    }
+    animate();
+})();
+
+// toggle card open/close
+function toggleLearnCard(btn) {
+    var body = btn.nextElementSibling;
+    var icon = btn.querySelector('.learn-card-icon');
+    var isOpen = btn.getAttribute('aria-expanded') === 'true';
+
+    if (isOpen) {
+        // close
+        btn.setAttribute('aria-expanded', 'false');
+        body.hidden = true;
+        icon.textContent = '+';
+        btn.closest('.learn-card').classList.remove('learn-card-open');
+    } else {
+        // open
+        btn.setAttribute('aria-expanded', 'true');
+        body.hidden = false;
+        icon.textContent = '-';
+        btn.closest('.learn-card').classList.add('learn-card-open');
+
+        // smooth scroll so user can see the content
+        setTimeout(function() {
+            body.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }, 50);
+    }
+}
+
+// scroll to a specific card and open it - used by the visual map buttons
+function scrollToCard(cardId) {
+    var card = document.getElementById(cardId);
+    if (!card) return;
+
+    var btn = card.querySelector('.learn-card-toggle');
+    if (!btn) return;
+
+    // only open the card if it is not already open
+    var isOpen = btn.getAttribute('aria-expanded') === 'true';
+    if (!isOpen) {
+        // open without the default scroll since we handle scroll ourselves
+        btn.setAttribute('aria-expanded', 'true');
+        var body = btn.nextElementSibling;
+        var icon = btn.querySelector('.learn-card-icon');
+        if (body) body.hidden = false;
+        if (icon) icon.textContent = '-';
+        card.classList.add('learn-card-open');
+    }
+
+    // scroll the card into view with a small delay so it opens first
+    setTimeout(function() {
+        card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
+
+    // add a brief highlight so user can see which card they jumped to
+    card.classList.add('learn-card-highlight');
+    setTimeout(function() {
+        card.classList.remove('learn-card-highlight');
+    }, 2000);
+}
+
+// hook up map buttons that scroll to cards (moved from inline onclick for CSP)
+document.querySelectorAll('[data-scroll-to]').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+        scrollToCard(btn.getAttribute('data-scroll-to'));
+    });
+});
+
+// hook up card toggle buttons (moved from inline onclick for CSP)
+document.querySelectorAll('.learn-card-toggle').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+        toggleLearnCard(btn);
+    });
+});
+</script>
+</body>
+</html>

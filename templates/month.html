@@ -1,0 +1,367 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>{{ month_name }} {{ view_year }} - Breaking Procrastination Paralysis</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500&family=Lora:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='calm.css') }}">
+</head>
+
+<body>
+<div class="page-wrapper">
+
+    <nav class="page-nav">
+        <a href="{{ url_for('dashboard') }}" class="nav-brand">Breaking Procrastination Paralysis</a>
+        <ul class="nav-links">
+            <li><a href="{{ url_for('today') }}">Today</a></li>
+            <li><a href="{{ url_for('journal') }}">Reflect</a></li>
+            <li><a href="{{ url_for('habits') }}">Tiny Steps</a></li>
+            <li><a href="{{ url_for('goals_page') }}">Intentions</a></li>
+            <li><a href="{{ url_for('week') }}">Week</a></li>
+            <li><a href="{{ url_for('month') }}" class="active">Month</a></li>
+            <li><a href="{{ url_for('analytics') }}">Patterns</a></li>
+            <li><a href="{{ url_for('learn') }}">Learn</a></li>
+            <li><a href="{{ url_for('logout') }}" class="logout-link">Log out</a></li>
+        </ul>
+    </nav>
+
+    <main class="page-content stagger-children">
+
+        <div class="section-header fade-in-up">
+            <h1 class="section-title">{{ month_name }} {{ view_year }}</h1>
+            <p class="section-subtitle">
+                A wider view. See how the month is shaping up without overthinking it.
+            </p>
+            <details class="psych-explainer">
+                <summary>Why this works</summary>
+                <p>Growth is often slow enough that you miss it without stepping back. A monthly view lets you notice gradual shifts that feel invisible day to day.</p>
+            </details>
+        </div>
+
+        <!-- month navigation - prev/next arrows -->
+        <div class="month-nav fade-in-up">
+            <a href="{{ url_for('month', year=prev_year, month=prev_month) }}" class="month-nav-btn" title="Previous month">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+            </a>
+            <span class="month-nav-title">{{ month_name }} {{ view_year }}</span>
+            <a href="{{ url_for('month', year=next_year, month=next_month) }}" class="month-nav-btn" title="Next month">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+            </a>
+            {% if not is_current_month %}
+            <a href="{{ url_for('month') }}" class="month-today-link">Back to this month</a>
+            {% endif %}
+        </div>
+
+        <!-- monthly summary stats -->
+        <div class="patterns-grid fade-in-up">
+            <div class="card pattern-card">
+                <p class="pattern-value">{{ total_entries }}</p>
+                <p class="pattern-label">Reflections</p>
+            </div>
+            <div class="card pattern-card">
+                <p class="pattern-value">{{ days_journaled }}</p>
+                <p class="pattern-label">Days journaled</p>
+            </div>
+            <div class="card pattern-card">
+                <p class="pattern-value">{{ total_habits_completed }}</p>
+                <p class="pattern-label">Habits completed</p>
+            </div>
+            {% if avg_paralysis is not none %}
+            <div class="card pattern-card">
+                <p class="pattern-value">{{ avg_paralysis }}</p>
+                <p class="pattern-label">Avg. paralysis score</p>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- calendar grid -->
+        <div class="month-calendar fade-in-up">
+            <!-- day name headers -->
+            <div class="month-header-row">
+                {% for header in day_headers %}
+                <div class="month-header-cell">{{ header }}</div>
+                {% endfor %}
+            </div>
+
+            <!-- weeks -->
+            {% for week in calendar_weeks %}
+            <div class="month-row">
+                {% for day in week %}
+                {% if day %}
+                <div class="month-cell {{ 'month-cell-today' if day.is_today }} {{ 'month-cell-past' if day.is_past }} {{ 'month-cell-has-data' if day.has_data }}"
+                     data-date="{{ day.date }}">
+                    <span class="month-day-num">{{ day.num }}</span>
+
+                    <!-- indicator dots row -->
+                    <div class="month-indicators">
+                        {% if day.emotions %}
+                        <!-- show up to 3 emotion dots, then a +N if more -->
+                        {% for emotion in day.emotions[:3] %}
+                        <span class="month-dot" style="background: var(--emotion-{{ emotion }}, var(--text-muted));" title="{{ emotion }}"></span>
+                        {% endfor %}
+                        {% if day.emotions|length > 3 %}
+                        <span class="month-dot-extra">+{{ day.emotions|length - 3 }}</span>
+                        {% endif %}
+                        {% endif %}
+
+                        {% if day.active_todos > 0 or day.done_todos > 0 %}
+                        <!-- task indicator -->
+                        {% if day.active_todos == 0 and day.done_todos > 0 %}
+                        <span class="month-indicator month-indicator-done" title="All tasks done">&#10003;</span>
+                        {% elif day.active_todos > 0 %}
+                        <span class="month-indicator month-indicator-pending" title="{{ day.active_todos }} task{{ 's' if day.active_todos != 1 }}">{{ day.active_todos }}</span>
+                        {% endif %}
+                        {% endif %}
+
+                        {% if day.habits_done > 0 and day.habits_total > 0 %}
+                        <!-- habit indicator -->
+                        {% if day.habits_done >= day.habits_total %}
+                        <span class="month-indicator month-indicator-habits-full" title="All habits done">&#9679;</span>
+                        {% else %}
+                        <span class="month-indicator month-indicator-habits-partial" title="{{ day.habits_done }}/{{ day.habits_total }} habits">&#9675;</span>
+                        {% endif %}
+                        {% endif %}
+                    </div>
+                </div>
+                {% else %}
+                <!-- empty padding cell for days outside this month -->
+                <div class="month-cell month-cell-empty"></div>
+                {% endif %}
+                {% endfor %}
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- day detail panel - shows when a day cell is clicked -->
+        <div class="month-detail-panel" id="monthDetailPanel" style="display: none;">
+            <div class="month-detail-header">
+                <h2 class="month-detail-title" id="monthDetailTitle"></h2>
+                <button type="button" class="month-detail-close" id="monthDetailClose" title="Close">&times;</button>
+            </div>
+            <div id="monthDetailContent"></div>
+        </div>
+
+        <!-- hidden detail blocks for each day that has data -->
+        {% for week in calendar_weeks %}
+        {% for day in week %}
+        {% if day and day.has_data %}
+        <div class="month-day-data" id="data-{{ day.date }}" style="display: none;"
+             data-title="{{ day.day_name }}, {{ day.date_display }}">
+
+            <!-- journal entries for this day -->
+            {% if day.journals %}
+            <div class="month-detail-section">
+                <h3 class="month-detail-label">Reflections</h3>
+                {% for entry in day.journals %}
+                <div class="week-journal-row">
+                    <span class="week-emotion-dot" style="background: var(--emotion-{{ entry.predicted_emotion }}, var(--text-muted));" title="{{ entry.predicted_emotion or 'unknown' }}"></span>
+                    <span class="week-journal-snippet">{{ entry.entry_text[:100] }}{% if entry.entry_text|length > 100 %}...{% endif %}</span>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <!-- goal steps for this day -->
+            {% if day.goal_steps %}
+            <div class="month-detail-section">
+                <h3 class="month-detail-label">Steps</h3>
+                {% for step in day.goal_steps %}
+                <div class="week-task-row {{ 'week-task-done' if step.get('is_completed_today') }}">
+                    {% if step.get('is_completed_today') %}
+                    <form method="post" action="{{ url_for('toggle_goal_step', step_id=step['id']) }}" class="week-task-form">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                        <input type="hidden" name="redirect" value="month">
+                        <input type="hidden" name="redirect_year" value="{{ view_year }}">
+                        <input type="hidden" name="redirect_month" value="{{ view_month }}">
+                        <button type="submit" class="week-task-check-done" title="Undo" style="cursor: pointer; border: none; background: none;">&#10003;</button>
+                    </form>
+                    <div class="week-task-content">
+                        <span class="week-task-text week-task-text-struck">{{ step['step_text'] }}</span>
+                        <div class="week-task-tags">
+                            <span class="source-badge goal">{{ step['goal_text'][:20] }}{% if step['goal_text']|length > 20 %}...{% endif %}</span>
+                            <span class="source-badge frequency-{{ step['frequency'] }}">{{ step['frequency'] }}</span>
+                        </div>
+                    </div>
+                    {% else %}
+                    <form method="post" action="{{ url_for('toggle_goal_step', step_id=step['id']) }}" class="week-task-form">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                        <input type="hidden" name="redirect" value="month">
+                        <input type="hidden" name="redirect_year" value="{{ view_year }}">
+                        <input type="hidden" name="redirect_month" value="{{ view_month }}">
+                        <button type="submit" class="week-task-check" title="Mark done"></button>
+                    </form>
+                    <div class="week-task-content">
+                        <span class="week-task-text">{{ step['step_text'] }}</span>
+                        <div class="week-task-tags">
+                            <span class="source-badge goal">{{ step['goal_text'][:20] }}{% if step['goal_text']|length > 20 %}...{% endif %}</span>
+                            <span class="source-badge frequency-{{ step['frequency'] }}">{{ step['frequency'] }}</span>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <!-- todos for this day -->
+            {% if day.todos %}
+            <div class="month-detail-section">
+                <h3 class="month-detail-label">Tasks</h3>
+                {% for todo in day.todos %}
+                <div class="week-task-row {{ 'week-task-done' if todo['is_done'] }}">
+                    {% if todo['is_done'] %}
+                    <span class="week-task-check-done">&#10003;</span>
+                    <div class="week-task-content">
+                        <span class="week-task-text week-task-text-struck">{{ todo['text'] }}</span>
+                    </div>
+                    {% else %}
+                    <form method="post" action="{{ url_for('toggle_todo', todo_id=todo['id']) }}" class="week-task-form">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                        <input type="hidden" name="redirect" value="month">
+                        <input type="hidden" name="redirect_year" value="{{ view_year }}">
+                        <input type="hidden" name="redirect_month" value="{{ view_month }}">
+                        <button type="submit" class="week-task-check" title="Mark done"></button>
+                    </form>
+                    <div class="week-task-content">
+                        <span class="week-task-text">{{ todo['text'] }}</span>
+                        {% if todo['source'] == 'journal' %}
+                        <span class="source-badge journal">from journal</span>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <!-- habit summary for this day -->
+            {% if day.habits_done > 0 %}
+            <div class="month-detail-section">
+                <h3 class="month-detail-label">Habits</h3>
+                <div class="week-habits-row">
+                    <div class="week-habits-bar-track">
+                        <div class="week-habits-bar-fill" style="width: {{ (day.habits_done / day.habits_total * 100) | round }}%;"></div>
+                    </div>
+                    <span class="week-habits-count">{{ day.habits_done }}/{{ day.habits_total }}</span>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+        {% endfor %}
+        {% endfor %}
+
+        <!-- message if month is completely empty -->
+        {% if total_entries == 0 and total_habits_completed == 0 %}
+        <div class="card fade-in-up" style="padding: 24px; text-align: center;">
+            <p class="section-subtitle">Nothing here yet. That is okay. Every month starts empty.</p>
+            {% if is_current_month %}
+            <a href="{{ url_for('journal') }}" class="btn-text" style="margin-top: 8px;">Start with a reflection</a>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        <div style="margin-top: 24px;">
+            <a href="{{ url_for('today') }}" class="btn-text">Back to Today</a>
+        </div>
+
+    </main>
+
+</div>
+
+<div class="cursor-glow" id="cursorGlow"></div>
+<script nonce="{{ csp_nonce() }}">
+(function() {
+    var glow = document.getElementById('cursorGlow');
+    if (!glow || window.innerWidth < 768) return;
+
+    var mouseX = -300, mouseY = -300;
+    var glowX = -300, glowY = -300;
+
+    document.addEventListener('mousemove', function(e) {
+        mouseX = e.clientX;
+        mouseY = e.clientY;
+    });
+
+    function animate() {
+        glowX += (mouseX - glowX) * 0.12;
+        glowY += (mouseY - glowY) * 0.12;
+        glow.style.left = glowX + 'px';
+        glow.style.top = glowY + 'px';
+        requestAnimationFrame(animate);
+    }
+    animate();
+})();
+
+// day detail expand/collapse
+var selectedCell = null;
+
+function showDayDetail(dateStr) {
+    var panel = document.getElementById('monthDetailPanel');
+    var content = document.getElementById('monthDetailContent');
+    var title = document.getElementById('monthDetailTitle');
+    var dataDiv = document.getElementById('data-' + dateStr);
+
+    if (!panel || !dataDiv) return;
+
+    // if clicking the same day again, close it
+    if (selectedCell && selectedCell.getAttribute('data-date') === dateStr && panel.style.display !== 'none') {
+        closeDayDetail();
+        return;
+    }
+
+    // highlight the clicked cell
+    var cells = document.querySelectorAll('.month-cell');
+    for (var i = 0; i < cells.length; i++) {
+        cells[i].classList.remove('month-cell-selected');
+    }
+
+    var clickedCell = document.querySelector('.month-cell[data-date="' + dateStr + '"]');
+    if (clickedCell) {
+        clickedCell.classList.add('month-cell-selected');
+        selectedCell = clickedCell;
+    }
+
+    // fill the detail panel with this days data
+    title.textContent = dataDiv.getAttribute('data-title');
+    content.innerHTML = dataDiv.innerHTML;
+    panel.style.display = 'block';
+
+    // scroll the panel into view smoothly
+    panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function closeDayDetail() {
+    var panel = document.getElementById('monthDetailPanel');
+    if (panel) panel.style.display = 'none';
+
+    // remove highlight from all cells
+    var cells = document.querySelectorAll('.month-cell');
+    for (var i = 0; i < cells.length; i++) {
+        cells[i].classList.remove('month-cell-selected');
+    }
+    selectedCell = null;
+}
+
+// hook up day cell clicks using event delegation (moved from inline onclick for CSP)
+var cal = document.querySelector('.month-calendar');
+if (cal) {
+    cal.addEventListener('click', function(e) {
+        var cell = e.target.closest('.month-cell-has-data');
+        if (cell) {
+            showDayDetail(cell.getAttribute('data-date'));
+        }
+    });
+}
+
+// hook up close button
+var closeBtn = document.getElementById('monthDetailClose');
+if (closeBtn) closeBtn.addEventListener('click', closeDayDetail);
+</script>
+</body>
+</html>
