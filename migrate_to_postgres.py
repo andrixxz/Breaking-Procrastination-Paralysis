@@ -32,10 +32,15 @@ cur.execute("""
         username TEXT UNIQUE NOT NULL,
         password_hash TEXT NOT NULL,
         created_at TEXT NOT NULL,
-        onboarding_complete INTEGER NOT NULL DEFAULT 0
+        onboarding_complete INTEGER NOT NULL DEFAULT 0,
+        failed_login_attempts INTEGER NOT NULL DEFAULT 0,
+        locked_until TEXT
     );
 """)
-print("  users table ready")
+# add lockout columns if the table already exists (safe to run multiple times)
+cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS failed_login_attempts INTEGER NOT NULL DEFAULT 0;")
+cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS locked_until TEXT;")
+print("  users table ready (with lockout columns)")
 
 # 2. goals - depends on users
 cur.execute("""

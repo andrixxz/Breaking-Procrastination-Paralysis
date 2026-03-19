@@ -4343,3 +4343,256 @@ input::placeholder {
         font-size: 0.85rem;
     }
 }
+
+
+/* --- Account Page --- */
+
+.account-section-title {
+    font-family: 'Inter', sans-serif;
+    font-size: 1.1rem;
+    font-weight: 500;
+    color: var(--text-primary);
+    margin-bottom: var(--space-sm);
+}
+
+.account-info-card,
+.account-data-card,
+.privacy-notice-card,
+.account-danger-card {
+    margin-bottom: var(--space-md);
+}
+
+.account-details {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.account-detail-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--bg-secondary);
+}
+
+.account-detail-row:last-child {
+    border-bottom: none;
+}
+
+.account-detail-label {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+}
+
+.account-detail-value {
+    font-size: 0.9rem;
+    color: var(--text-primary);
+    font-weight: 500;
+}
+
+.account-data-intro {
+    font-size: 0.88rem;
+    color: var(--text-secondary);
+    margin-bottom: var(--space-sm);
+}
+
+.account-data-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: var(--space-sm);
+}
+
+.account-data-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 12px 8px;
+    background: var(--bg-secondary);
+    border-radius: var(--radius-md);
+}
+
+.account-data-count {
+    font-size: 1.4rem;
+    font-weight: 500;
+    color: var(--sage-green-dark);
+}
+
+.account-data-type {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    margin-top: 4px;
+    text-align: center;
+}
+
+/* privacy notice */
+
+.privacy-content {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+}
+
+.privacy-section {
+    padding-bottom: var(--space-sm);
+    border-bottom: 1px solid var(--bg-secondary);
+}
+
+.privacy-section:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
+.privacy-heading {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+}
+
+.privacy-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.privacy-list li {
+    font-size: 0.88rem;
+    color: var(--text-secondary);
+    line-height: 1.55;
+    padding: 4px 0 4px 16px;
+    position: relative;
+}
+
+.privacy-list li::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 12px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--sage-green-light);
+}
+
+/* delete account area */
+
+.account-danger-card {
+    border: 1px solid var(--blush-pink);
+}
+
+.account-danger-title {
+    color: #C0392B;
+}
+
+.account-danger-text {
+    font-size: 0.88rem;
+    color: var(--text-secondary);
+    line-height: 1.55;
+    margin-bottom: var(--space-md);
+}
+
+.account-delete-section {
+    margin-top: var(--space-sm);
+}
+
+.account-delete-confirm {
+    margin-top: var(--space-sm);
+}
+
+.account-delete-warning {
+    font-size: 0.88rem;
+    color: var(--text-secondary);
+    margin-bottom: var(--space-sm);
+}
+
+.account-delete-input-row {
+    display: flex;
+    gap: var(--space-sm);
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.account-delete-input {
+    flex: 1;
+    min-width: 200px;
+    padding: 10px 14px;
+    border: 1px solid var(--blush-pink);
+    border-radius: var(--radius-md);
+    font-size: 0.9rem;
+    font-family: inherit;
+    background: var(--bg-card);
+    color: var(--text-primary);
+}
+
+.account-delete-input:focus {
+    outline: none;
+    border-color: #C0392B;
+    box-shadow: 0 0 0 3px rgba(192, 57, 43, 0.1);
+}
+
+.btn-delete-account {
+    background: #C0392B;
+    color: #fff;
+    border: none;
+    border-radius: var(--radius-pill);
+    padding: 10px 20px;
+    font-size: 0.88rem;
+    font-family: inherit;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--transition-quick) var(--ease-calm);
+    white-space: nowrap;
+}
+
+.btn-delete-account:hover:not(:disabled) {
+    background: #A93226;
+}
+
+.btn-delete-account:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+/* privacy notice on signup page */
+
+.signup-privacy-notice {
+    margin-top: var(--space-md);
+    padding: var(--space-sm) var(--space-md);
+    background: var(--bg-secondary);
+    border-radius: var(--radius-md);
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    line-height: 1.55;
+}
+
+.signup-privacy-notice a {
+    color: var(--sage-green-dark);
+    text-decoration: underline;
+}
+
+.signup-privacy-notice a:hover {
+    color: var(--sage-green);
+}
+
+/* account page responsive */
+
+@media (max-width: 768px) {
+    .account-data-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .account-delete-input-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .account-delete-input {
+        min-width: unset;
+    }
+
+    .btn-delete-account {
+        text-align: center;
+    }
+}

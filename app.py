@@ -224,14 +224,16 @@ def init_db():
     conn = get_db_connection()
     cur = conn.cursor()
 
-    # users table
+    # users table - includes lockout columns for account security
     cur.execute("""
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT UNIQUE NOT NULL,
             password_hash TEXT NOT NULL,
             created_at TEXT NOT NULL,
-            onboarding_complete INTEGER NOT NULL DEFAULT 0
+            onboarding_complete INTEGER NOT NULL DEFAULT 0,
+            failed_login_attempts INTEGER NOT NULL DEFAULT 0,
+            locked_until TEXT
         );
     """)
 
@@ -346,6 +348,12 @@ def migrate_db_for_onboarding():
     columns = [col[1] for col in cur.fetchall()]
     if 'onboarding_complete' not in columns:
         cur.execute("ALTER TABLE users ADD COLUMN onboarding_complete INTEGER NOT NULL DEFAULT 0")
+
+    # 1b. Add lockout columns for account security (Task 5.9)
+    if 'failed_login_attempts' not in columns:
+        cur.execute("ALTER TABLE users ADD COLUMN failed_login_attempts INTEGER NOT NULL DEFAULT 0")
+    if 'locked_until' not in columns:
+        cur.execute("ALTER TABLE users ADD COLUMN locked_until TEXT")
 
     # 2. Create goals table
     cur.execute("""
@@ -495,6 +503,20 @@ def initialize_user_data(user_id):
 
 
 # authentication
+
+
+def update_login_attempts(cur, conn, user_id, attempts, locked_until):
+    """updates the lockout columns on the users table after a login attempt
+    on postgres we need to RESET ROLE because RLS blocks user updates
+    when nobody is logged in yet (no app.current_user_id set)"""
+    if USE_POSTGRES:
+        cur.execute("RESET ROLE;")
+    cur.execute(
+        "UPDATE users SET failed_login_attempts = %s, locked_until = %s WHERE id = %s",
+        (attempts, locked_until, user_id)
+    )
+    conn.commit()
+
 
 def login_required(f):
     @wraps(f)
@@ -2361,23 +2383,181 @@ def login():
 
         conn = get_db_connection()
         cur = conn.cursor()
-        cur.execute("SELECT id, password_hash FROM users WHERE username = %s", (username,))
-        user = cur.fetchone()
-        conn.close()
+        try:
+            cur.execute(
+                "SELECT id, password_hash, failed_login_attempts, locked_until "
+                "FROM users WHERE username = %s", (username,)
+            )
+            user = cur.fetchone()
 
-        if user and check_password_hash(user["password_hash"], password):
-            session.permanent = True
-            session['user_id'] = user["id"]
-            session['username'] = username
-            return redirect(url_for('dashboard'))
+            if not user:
+                # dont reveal whether the username exists or not
+                flash("Invalid username or password.", "error")
+                return render_template("login.html")
 
-        flash("Invalid username or password.", "error")
+            # check if this account is locked right now
+            now = datetime.now()
+            if user["locked_until"]:
+                lock_expires = datetime.fromisoformat(user["locked_until"])
+                if now < lock_expires:
+                    # still locked - tell them how long to wait
+                    remaining = (lock_expires - now).total_seconds()
+                    mins = max(1, int(remaining / 60) + 1)
+                    flash(
+                        "Account temporarily locked. Try again in "
+                        + str(mins) + " minute" + ("s" if mins != 1 else "") + ".",
+                        "error"
+                    )
+                    return render_template("login.html")
+
+            # check password
+            if check_password_hash(user["password_hash"], password):
+                # correct password - reset lockout and log them in
+                update_login_attempts(cur, conn, user["id"], 0, None)
+                session.permanent = True
+                session['user_id'] = user["id"]
+                session['username'] = username
+                return redirect(url_for('dashboard'))
+
+            # wrong password - count the failure
+            # if a previous lock just expired, start the count fresh
+            if user["locked_until"]:
+                lock_time = datetime.fromisoformat(user["locked_until"])
+                if now >= lock_time:
+                    attempts = 1
+                else:
+                    attempts = (user["failed_login_attempts"] or 0) + 1
+            else:
+                attempts = (user["failed_login_attempts"] or 0) + 1
+
+            # lock the account after 5 failed attempts
+            lock_until = None
+            if attempts >= 5:
+                lock_until = (now + timedelta(minutes=15)).isoformat(timespec="seconds")
+
+            update_login_attempts(cur, conn, user["id"], attempts, lock_until)
+
+            if attempts >= 5:
+                flash("Too many failed attempts. Account locked for 15 minutes.", "error")
+            else:
+                remaining_attempts = 5 - attempts
+                if remaining_attempts <= 2:
+                    # warn them when they're close to getting locked out
+                    flash(
+                        "Invalid username or password. "
+                        + str(remaining_attempts) + " attempt"
+                        + ("s" if remaining_attempts != 1 else "") + " remaining before lockout.",
+                        "error"
+                    )
+                else:
+                    flash("Invalid username or password.", "error")
+
+        finally:
+            conn.close()
 
     return render_template("login.html")
 
 
 @app.route("/logout")
 def logout():
+    session.clear()
+    return redirect(url_for('landing'))
+
+
+@app.route("/account")
+@login_required
+def account():
+    """shows the account page with privacy info and delete option"""
+    user_id = session['user_id']
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+        # grab some stats so the user knows what data we have on them
+        cur.execute("SELECT username, created_at FROM users WHERE id = %s", (user_id,))
+        user = cur.fetchone()
+        cur.execute("SELECT COUNT(*) as count FROM journal_entries WHERE user_id = %s", (user_id,))
+        journal_count = cur.fetchone()["count"]
+        cur.execute("SELECT COUNT(*) as count FROM goals WHERE user_id = %s", (user_id,))
+        goal_count = cur.fetchone()["count"]
+        cur.execute("SELECT COUNT(*) as count FROM habits WHERE user_id = %s", (user_id,))
+        habit_count = cur.fetchone()["count"]
+        cur.execute("SELECT COUNT(*) as count FROM todos WHERE user_id = %s", (user_id,))
+        todo_count = cur.fetchone()["count"]
+    finally:
+        conn.close()
+
+    return render_template(
+        "account.html",
+        username=user["username"],
+        created_at=user["created_at"],
+        journal_count=journal_count,
+        goal_count=goal_count,
+        habit_count=habit_count,
+        todo_count=todo_count,
+    )
+
+
+@app.route("/delete-account", methods=["POST"])
+@login_required
+def delete_account():
+    """permanently deletes the user and all their data - GDPR right to erasure"""
+    user_id = session['user_id']
+
+    # the confirmation field must say "DELETE" exactly
+    confirmation = request.form.get("confirmation", "").strip()
+    if confirmation != "DELETE":
+        flash("You must type DELETE to confirm account deletion.", "error")
+        return redirect(url_for('account'))
+
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+
+        # on postgres we need to bypass RLS to delete from all tables
+        # the flask_app role has RLS restricting deletes to own rows but
+        # some child tables (habit_completions, step_completions) dont have user_id
+        # so we reset role to postgres superuser for the full cascade
+        if USE_POSTGRES:
+            cur.execute("RESET ROLE;")
+
+        # delete in order - children first, then parent tables, then user last
+        # habit_completions depends on habits so delete it first
+        cur.execute(
+            "DELETE FROM habit_completions WHERE habit_id IN "
+            "(SELECT id FROM habits WHERE user_id = %s)",
+            (user_id,)
+        )
+
+        # step_completions depends on goal_steps
+        cur.execute(
+            "DELETE FROM step_completions WHERE step_id IN "
+            "(SELECT id FROM goal_steps WHERE user_id = %s)",
+            (user_id,)
+        )
+
+        # now delete the tables that directly reference user_id
+        cur.execute("DELETE FROM goal_steps WHERE user_id = %s", (user_id,))
+        cur.execute("DELETE FROM positive_thoughts WHERE user_id = %s", (user_id,))
+        cur.execute("DELETE FROM identity_beliefs WHERE user_id = %s", (user_id,))
+        cur.execute("DELETE FROM todos WHERE user_id = %s", (user_id,))
+        cur.execute("DELETE FROM habits WHERE user_id = %s", (user_id,))
+        cur.execute("DELETE FROM journal_entries WHERE user_id = %s", (user_id,))
+        cur.execute("DELETE FROM alignment_state WHERE user_id = %s", (user_id,))
+        cur.execute("DELETE FROM goals WHERE user_id = %s", (user_id,))
+
+        # finally delete the user row itself
+        cur.execute("DELETE FROM users WHERE id = %s", (user_id,))
+
+        conn.commit()
+    except Exception as e:
+        # if something goes wrong, dont leave the user in a half-deleted state
+        conn.rollback()
+        flash("Something went wrong while deleting your account. Please try again.", "error")
+        return redirect(url_for('account'))
+    finally:
+        conn.close()
+
+    # clear the session and send them to the landing page
     session.clear()
     return redirect(url_for('landing'))
 

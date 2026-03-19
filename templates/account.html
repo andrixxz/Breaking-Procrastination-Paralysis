@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Your Account - Breaking Procrastination Paralysis</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500&family=Lora:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='calm.css') }}">
+</head>
+<body>
+<div class="page-wrapper">
+
+    <nav class="page-nav">
+        <a href="{{ url_for('dashboard') }}" class="nav-brand">Breaking Procrastination Paralysis</a>
+        <ul class="nav-links">
+            <li><a href="{{ url_for('today') }}">Today</a></li>
+            <li><a href="{{ url_for('journal') }}">Reflect</a></li>
+            <li><a href="{{ url_for('habits') }}">Tiny Steps</a></li>
+            <li><a href="{{ url_for('goals_page') }}">Intentions</a></li>
+            <li><a href="{{ url_for('week') }}">Week</a></li>
+            <li><a href="{{ url_for('month') }}">Month</a></li>
+            <li><a href="{{ url_for('analytics') }}">Patterns</a></li>
+            <li><a href="{{ url_for('learn') }}">Learn</a></li>
+            <li><a href="{{ url_for('account') }}">Account</a></li>
+            <li><a href="{{ url_for('logout') }}" class="logout-link">Log out</a></li>
+        </ul>
+    </nav>
+
+    <main class="page-content stagger-children">
+
+        <div class="greeting">
+            <h1 class="greeting-text">Your Account</h1>
+            <p class="greeting-sub">Manage your data and privacy.</p>
+        </div>
+
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+            <div class="auth-flash" style="margin-bottom: var(--space-md);">
+                {% for message in messages %}
+                <p>{{ message }}</p>
+                {% endfor %}
+            </div>
+            {% endif %}
+        {% endwith %}
+
+        <!-- account info -->
+        <div class="card account-info-card fade-in-up">
+            <h2 class="account-section-title">Account Details</h2>
+            <div class="account-details">
+                <div class="account-detail-row">
+                    <span class="account-detail-label">Username</span>
+                    <span class="account-detail-value">{{ username }}</span>
+                </div>
+                <div class="account-detail-row">
+                    <span class="account-detail-label">Member since</span>
+                    <span class="account-detail-value">{{ created_at[:10] }}</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- your data summary -->
+        <div class="card account-data-card fade-in-up">
+            <h2 class="account-section-title">Your Data</h2>
+            <p class="account-data-intro">Here is a summary of what we store for your account.</p>
+            <div class="account-data-grid">
+                <div class="account-data-item">
+                    <span class="account-data-count">{{ journal_count }}</span>
+                    <span class="account-data-type">Journal entries</span>
+                </div>
+                <div class="account-data-item">
+                    <span class="account-data-count">{{ goal_count }}</span>
+                    <span class="account-data-type">Intentions</span>
+                </div>
+                <div class="account-data-item">
+                    <span class="account-data-count">{{ habit_count }}</span>
+                    <span class="account-data-type">Habits</span>
+                </div>
+                <div class="account-data-item">
+                    <span class="account-data-count">{{ todo_count }}</span>
+                    <span class="account-data-type">Todos</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- privacy notice -->
+        <div class="card privacy-notice-card fade-in-up">
+            <h2 class="account-section-title">Privacy Notice</h2>
+            <div class="privacy-content">
+                <div class="privacy-section">
+                    <h3 class="privacy-heading">What data we collect</h3>
+                    <ul class="privacy-list">
+                        <li>Your username and a hashed version of your password (we never store your actual password)</li>
+                        <li>Journal entries you write, along with the emotions and behaviour states our ML model detects</li>
+                        <li>Your intentions (goals), identity beliefs, positive thoughts, and habit tracking data</li>
+                        <li>Your alignment score and emotional streak</li>
+                        <li>Todos and goal steps you create</li>
+                    </ul>
+                </div>
+
+                <div class="privacy-section">
+                    <h3 class="privacy-heading">How we use your data</h3>
+                    <ul class="privacy-list">
+                        <li>To personalise your experience - reframes, affirmations and micro-tasks are based on your journal entries and identity beliefs</li>
+                        <li>To track your progress through alignment scores, streaks and analytics</li>
+                        <li>To run our ML emotion and behaviour detection on your journal text</li>
+                        <li>We do <strong>not</strong> share your data with any third parties</li>
+                        <li>We do <strong>not</strong> use your data for advertising</li>
+                        <li>We do <strong>not</strong> sell your data to anyone</li>
+                    </ul>
+                </div>
+
+                <div class="privacy-section">
+                    <h3 class="privacy-heading">How we protect your data</h3>
+                    <ul class="privacy-list">
+                        <li>Your password is hashed using industry-standard Werkzeug hashing before storage</li>
+                        <li>All connections use HTTPS encryption in production</li>
+                        <li>Row-Level Security on the database means you can only ever access your own data</li>
+                        <li>CSRF protection on every form prevents forged requests</li>
+                        <li>Content Security Policy headers block injected scripts</li>
+                        <li>Input sanitisation strips dangerous content from all text you submit</li>
+                    </ul>
+                </div>
+
+                <div class="privacy-section">
+                    <h3 class="privacy-heading">Your rights</h3>
+                    <ul class="privacy-list">
+                        <li><strong>Right to access:</strong> You can see all your data through the app at any time</li>
+                        <li><strong>Right to erasure:</strong> You can permanently delete your account and all associated data using the button below</li>
+                        <li><strong>Right to rectification:</strong> You can edit your journal entries and update your habits, goals and beliefs at any time</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- delete account section -->
+        <div class="card account-danger-card fade-in-up">
+            <h2 class="account-section-title account-danger-title">Delete Account</h2>
+            <p class="account-danger-text">
+                This will permanently delete your account and all your data. This includes your journal entries,
+                intentions, identity beliefs, positive thoughts, habits, todos, goal steps, alignment score and
+                emotional streak. <strong>This cannot be undone.</strong>
+            </p>
+
+            <div class="account-delete-section" id="deleteSection">
+                <button type="button" class="btn-danger-soft" id="showDeleteConfirm">
+                    I want to delete my account
+                </button>
+
+                <div class="account-delete-confirm" id="deleteConfirm" style="display: none;">
+                    <p class="account-delete-warning">
+                        To confirm, type <strong>DELETE</strong> in the box below and press the button.
+                    </p>
+                    <form method="post" action="{{ url_for('delete_account') }}" id="deleteForm">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                        <div class="account-delete-input-row">
+                            <input
+                                type="text"
+                                name="confirmation"
+                                id="deleteConfirmInput"
+                                placeholder="Type DELETE to confirm"
+                                autocomplete="off"
+                                class="account-delete-input"
+                            >
+                            <button type="submit" class="btn-delete-account" id="deleteBtn" disabled>
+                                Permanently delete my account
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+</div>
+
+<div class="cursor-glow" id="cursorGlow"></div>
+<script nonce="{{ csp_nonce() }}">
+(function() {
+    var glow = document.getElementById('cursorGlow');
+    if (glow && window.innerWidth >= 768) {
+        var mouseX = -300, mouseY = -300, glowX = -300, glowY = -300;
+        document.addEventListener('mousemove', function(e) {
+            mouseX = e.clientX;
+            mouseY = e.clientY;
+        });
+        function animate() {
+            glowX += (mouseX - glowX) * 0.12;
+            glowY += (mouseY - glowY) * 0.12;
+            glow.style.left = glowX + 'px';
+            glow.style.top = glowY + 'px';
+            requestAnimationFrame(animate);
+        }
+        animate();
+    }
+
+    // show the delete confirmation when the user clicks the first button
+    var showBtn = document.getElementById('showDeleteConfirm');
+    var confirmDiv = document.getElementById('deleteConfirm');
+    if (showBtn && confirmDiv) {
+        showBtn.addEventListener('click', function() {
+            confirmDiv.style.display = 'block';
+            showBtn.style.display = 'none';
+            document.getElementById('deleteConfirmInput').focus();
+        });
+    }
+
+    // only enable the delete button when the user types exactly "DELETE"
+    var input = document.getElementById('deleteConfirmInput');
+    var deleteBtn = document.getElementById('deleteBtn');
+    if (input && deleteBtn) {
+        input.addEventListener('input', function() {
+            deleteBtn.disabled = (input.value.trim() !== 'DELETE');
+        });
+    }
+
+    // final confirmation dialog before actually submitting
+    var deleteForm = document.getElementById('deleteForm');
+    if (deleteForm) {
+        deleteForm.addEventListener('submit', function(e) {
+            if (!confirm('Are you absolutely sure? All your data will be permanently deleted. This cannot be undone.')) {
+                e.preventDefault();
+            }
+        });
+    }
+})();
+</script>
+</body>
+</html>
