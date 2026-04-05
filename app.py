@@ -8,6 +8,9 @@ import os
 import html as html_module
 import calendar as cal_module
 import bleach
+import re
+import math
+import json
 from datetime import datetime, date, timedelta
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
@@ -74,7 +77,7 @@ app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)
 # using nonces for scripts so only our tagged script blocks run
 csp = {
     'default-src': "'self'",
-    'script-src': "'self'",
+    'script-src': "'self' https://cdn.jsdelivr.net",
     'style-src': "'self' 'unsafe-inline' https://fonts.googleapis.com",
     'font-src': "'self' https://fonts.gstatic.com",
     'img-src': "'self' data:",
@@ -2769,25 +2772,103 @@ def journal():
                     # Called after save so the new entry is included
                     daily_insight = get_daily_insight(user_id)
 
-    # load journal history
+    # pagination and filter params from the query string
+    page = request.args.get("page", 1, type=int)
+    per_page = request.args.get("per_page", 10, type=int)
+    filter_emotion = request.args.get("emotion", "").strip()
+    filter_period = request.args.get("period", "").strip()
+    date_from = request.args.get("date_from", "").strip()
+    date_to = request.args.get("date_to", "").strip()
+
+    # clamp per_page to allowed values so nobody passes in 9999
+    allowed_per_page = [5, 10, 25]
+    if per_page not in allowed_per_page:
+        per_page = 10
+
+    # page must be at least 1
+    if page < 1:
+        page = 1
+
+    # valid emotions for the filter dropdown
+    valid_emotions = [
+        "overwhelmed", "anxious", "stuck", "stressed", "tired", "calm",
+        "frustrated", "guilty", "unmotivated", "hopeful", "proud",
+    ]
+    if filter_emotion and filter_emotion not in valid_emotions:
+        filter_emotion = ""
+
+    # build the WHERE clause dynamically based on filters
+    where_parts = ["user_id = %s"]
+    params = [user_id]
+
+    if filter_emotion:
+        where_parts.append("predicted_emotion = %s")
+        params.append(filter_emotion)
+
+    # date filtering based on period or custom range
+    # created_at is stored as ISO text (e.g. 2026-03-24T14:30:00)
+    # so we compare as strings which works because ISO dates sort correctly
+    if filter_period == "week":
+        week_ago = (datetime.now() - timedelta(days=7)).isoformat(timespec="seconds")
+        where_parts.append("created_at >= %s")
+        params.append(week_ago)
+    elif filter_period == "month":
+        month_ago = (datetime.now() - timedelta(days=30)).isoformat(timespec="seconds")
+        where_parts.append("created_at >= %s")
+        params.append(month_ago)
+    elif filter_period == "custom":
+        # validate date format (YYYY-MM-DD) to prevent bad input
+        date_pattern = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+        if date_from and date_pattern.match(date_from):
+            where_parts.append("created_at >= %s")
+            params.append(date_from)
+        if date_to and date_pattern.match(date_to):
+            # add a day so the end date is inclusive
+            where_parts.append("created_at < %s")
+            params.append(date_to + "T23:59:59")
+
+    where_clause = " AND ".join(where_parts)
+
+    # load journal history with pagination
     conn = get_db_connection()
     try:
         cur = conn.cursor()
+
+        # first get total count for pagination controls
         cur.execute(
-            "SELECT id, entry_text, predicted_emotion, predicted_behaviour, "
-            "paralysis_score, reframe, micro_task_text, micro_task_minutes, created_at "
-            "FROM journal_entries WHERE user_id = %s ORDER BY id DESC;",
-            (user_id,),
+            f"SELECT COUNT(*) AS cnt FROM journal_entries WHERE {where_clause};",
+            tuple(params),
+        )
+        total_entries = cur.fetchone()["cnt"]
+
+        # work out total pages and clamp current page
+        total_pages = max(1, math.ceil(total_entries / per_page))
+        if page > total_pages:
+            page = total_pages
+
+        offset = (page - 1) * per_page
+
+        # grab just the entries for this page
+        cur.execute(
+            f"SELECT id, entry_text, predicted_emotion, predicted_behaviour, "
+            f"paralysis_score, reframe, micro_task_text, micro_task_minutes, created_at "
+            f"FROM journal_entries WHERE {where_clause} "
+            f"ORDER BY id DESC LIMIT %s OFFSET %s;",
+            tuple(params) + (per_page, offset),
         )
         entries = cur.fetchall()
+
+        # also need the total journal count (unfiltered) for the first-use message
+        cur.execute(
+            "SELECT COUNT(*) AS cnt FROM journal_entries WHERE user_id = %s;",
+            (user_id,),
+        )
+        journal_count = cur.fetchone()["cnt"]
     finally:
         conn.close()
 
     # Get streak for display
     _, emotional_streak, _ = get_alignment_state(user_id)
-
-    # journal_count used to show first-use context on the page
-    journal_count = len(entries)
 
     return render_template(
         "journal.html",
@@ -2806,6 +2887,17 @@ def journal():
         journal_count=journal_count,
         daily_insight=daily_insight,
         error_message=error_message,
+        # pagination stuff
+        page=page,
+        per_page=per_page,
+        total_pages=total_pages,
+        total_entries=total_entries,
+        # active filters so the template can highlight them
+        filter_emotion=filter_emotion,
+        filter_period=filter_period,
+        date_from=date_from,
+        date_to=date_to,
+        valid_emotions=valid_emotions,
     )
 
 
@@ -3269,6 +3361,9 @@ def today():
         else:
             current_stage = None
 
+        # daily insight from temporal analysis - same as dashboard
+        daily_insight = get_daily_insight(user_id)
+
     finally:
         conn.close()
 
@@ -3305,6 +3400,7 @@ def today():
         habit_done=habit_done,
         step_done=step_done,
         current_stage=current_stage,
+        daily_insight=daily_insight,
     )
 
 
@@ -3368,10 +3464,10 @@ def week():
                 step_comps_by_date[d] = set()
             step_comps_by_date[d].add(sc['step_id'])
 
-        # journal entries this week with emotion for the colour dots
+        # journal entries this week - need emotion, behaviour and score for summary stats
         cur.execute(
-            "SELECT id, entry_text, predicted_emotion, "
-            "date(created_at) as entry_date "
+            "SELECT id, entry_text, predicted_emotion, predicted_behaviour, "
+            "paralysis_score, date(created_at) as entry_date "
             "FROM journal_entries WHERE user_id = %s "
             "AND date(created_at) BETWEEN %s AND %s "
             "ORDER BY created_at ASC",
@@ -3514,6 +3610,44 @@ def week():
     total_journal_entries = len(week_journals)
     total_habits_done = sum(d['habits_done'] for d in week_days)
 
+    # avg paralysis score for the week
+    week_scores = [j['paralysis_score'] for j in week_journals if j['paralysis_score'] is not None]
+    week_avg_paralysis = round(sum(week_scores) / len(week_scores), 1) if week_scores else None
+
+    # most common emotion this week (skip nulls)
+    week_emotions = [j['predicted_emotion'] for j in week_journals if j['predicted_emotion']]
+    week_top_emotion = None
+    if week_emotions:
+        emotion_counts = {}
+        for e in week_emotions:
+            emotion_counts[e] = emotion_counts.get(e, 0) + 1
+        week_top_emotion = max(emotion_counts, key=emotion_counts.get)
+
+    # count positive behaviour shifts within each day
+    # a positive shift = moving from a negative state to a positive one in the same day
+    negative_behaviours = {'Avoidance', 'Overwhelm', 'Rumination'}
+    positive_behaviours = {'Action', 'Completion', 'Recovery'}
+    week_positive_shifts = 0
+
+    # group behaviours by date so we can check transitions per day
+    behaviours_by_date = {}
+    for j in week_journals:
+        b = j['predicted_behaviour']
+        if b:
+            d = j['entry_date']
+            if d not in behaviours_by_date:
+                behaviours_by_date[d] = []
+            behaviours_by_date[d].append(b)
+
+    for day_date_key, day_behaviours in behaviours_by_date.items():
+        if len(day_behaviours) < 2:
+            continue
+        for idx in range(1, len(day_behaviours)):
+            prev_b = day_behaviours[idx - 1]
+            curr_b = day_behaviours[idx]
+            if prev_b in negative_behaviours and curr_b in positive_behaviours:
+                week_positive_shifts += 1
+
     return render_template(
         "week.html",
         week_days=week_days,
@@ -3523,6 +3657,9 @@ def week():
         total_journal_entries=total_journal_entries,
         total_habits_done=total_habits_done,
         total_habits=total_habits,
+        week_avg_paralysis=week_avg_paralysis,
+        week_top_emotion=week_top_emotion,
+        week_positive_shifts=week_positive_shifts,
     )
 
 
@@ -3784,6 +3921,116 @@ def month():
 
     days_journaled = len(journals_by_date)
 
+    # most common emotion this month
+    month_emotions = [j['predicted_emotion'] for j in month_journals if j['predicted_emotion']]
+    month_top_emotion = None
+    if month_emotions:
+        em_counts = {}
+        for e in month_emotions:
+            em_counts[e] = em_counts.get(e, 0) + 1
+        month_top_emotion = max(em_counts, key=em_counts.get)
+
+    # positive behaviour shifts (negative to positive within the same day)
+    neg_behaviours = {'Avoidance', 'Overwhelm', 'Rumination'}
+    pos_behaviours = {'Action', 'Completion', 'Recovery'}
+    month_positive_shifts = 0
+
+    month_behaviours_by_date = {}
+    for j in month_journals:
+        b = j['predicted_behaviour']
+        if b:
+            d = j['entry_date']
+            if d not in month_behaviours_by_date:
+                month_behaviours_by_date[d] = []
+            month_behaviours_by_date[d].append(b)
+
+    for day_key, day_bs in month_behaviours_by_date.items():
+        if len(day_bs) < 2:
+            continue
+        for idx in range(1, len(day_bs)):
+            if day_bs[idx - 1] in neg_behaviours and day_bs[idx] in pos_behaviours:
+                month_positive_shifts += 1
+
+    # previous month comparison - only if there is data from last month
+    prev_total_entries = 0
+    prev_total_habits = 0
+    prev_avg_paralysis = None
+    prev_month_has_data = False
+
+    # work out the previous month date range
+    if prev_month == 12:
+        prev_m_start = date(prev_year, 12, 1)
+        prev_m_end = date(prev_year, 12, 31)
+    else:
+        prev_m_start = date(prev_year, prev_month, 1)
+        prev_m_end = date(prev_year, prev_month + 1, 1) - timedelta(days=1)
+
+    prev_m_start_str = prev_m_start.isoformat()
+    prev_m_end_str = prev_m_end.isoformat()
+
+    conn2 = get_db_connection()
+    try:
+        cur2 = conn2.cursor()
+
+        # previous month journal count and avg paralysis
+        cur2.execute(
+            "SELECT COUNT(*) as cnt, AVG(paralysis_score) as avg_p "
+            "FROM journal_entries WHERE user_id = %s "
+            "AND date(created_at) BETWEEN %s AND %s",
+            (user_id, prev_m_start_str, prev_m_end_str),
+        )
+        prev_row = cur2.fetchone()
+        prev_total_entries = prev_row['cnt'] or 0
+        if prev_row['avg_p'] is not None:
+            prev_avg_paralysis = round(prev_row['avg_p'], 1)
+
+        # previous month habit completions
+        cur2.execute(
+            "SELECT COUNT(*) as cnt FROM habit_completions hc "
+            "JOIN habits h ON hc.habit_id = h.id "
+            "WHERE h.user_id = %s AND date(hc.completed_at) BETWEEN %s AND %s "
+            "AND (h.is_hidden IS NULL OR h.is_hidden = 0)",
+            (user_id, prev_m_start_str, prev_m_end_str),
+        )
+        prev_total_habits = cur2.fetchone()['cnt'] or 0
+
+        prev_month_has_data = (prev_total_entries > 0 or prev_total_habits > 0)
+    finally:
+        conn2.close()
+
+    # work out comparison direction (up, down, same) for each metric
+    def compare(current, previous):
+        """figure out if a number went up, down, or stayed the same"""
+        if previous is None or previous == 0:
+            return None
+        if current > previous:
+            return 'up'
+        elif current < previous:
+            return 'down'
+        return 'same'
+
+    # for paralysis score, lower is better so we flip the direction
+    def compare_paralysis(current, previous):
+        """for paralysis score lower is better, so down = good"""
+        if current is None or previous is None:
+            return None
+        if current < previous:
+            return 'improved'
+        elif current > previous:
+            return 'worsened'
+        return 'same'
+
+    comparison = None
+    if prev_month_has_data:
+        comparison = {
+            'entries': compare(total_entries, prev_total_entries),
+            'entries_prev': prev_total_entries,
+            'habits': compare(total_habits_completed, prev_total_habits),
+            'habits_prev': prev_total_habits,
+            'paralysis': compare_paralysis(avg_paralysis, prev_avg_paralysis),
+            'paralysis_prev': prev_avg_paralysis,
+        }
+
     return render_template(
         "month.html",
         calendar_weeks=calendar_weeks,
@@ -3802,6 +4049,9 @@ def month():
         avg_paralysis=avg_paralysis,
         days_journaled=days_journaled,
         is_current_month=(view_year == today_obj.year and view_month == today_obj.month),
+        month_top_emotion=month_top_emotion,
+        month_positive_shifts=month_positive_shifts,
+        comparison=comparison,
     )
 
 
@@ -3880,44 +4130,208 @@ def habits():
 @onboarding_check
 def analytics():
     user_id = session['user_id']
+
+    # which date range the user wants for the mood chart
+    chart_range = request.args.get("range", "30", type=str)
+    if chart_range not in ["7", "14", "30"]:
+        chart_range = "30"
+    range_days = int(chart_range)
+
     conn = get_db_connection()
-    cur = conn.cursor()
+    try:
+        cur = conn.cursor()
 
-    # 1. emotion distribution across this user's journal entries
-    cur.execute("""
-        SELECT predicted_emotion, COUNT(*) as count
-        FROM journal_entries
-        WHERE user_id = %s
-        GROUP BY predicted_emotion
-    """, (user_id,))
-    emotion_data = cur.fetchall()
+        # 1. emotion distribution across all journal entries
+        cur.execute("""
+            SELECT predicted_emotion, COUNT(*) as count
+            FROM journal_entries
+            WHERE user_id = %s
+            GROUP BY predicted_emotion
+        """, (user_id,))
+        emotion_data = cur.fetchall()
 
-    # 2. days user journaled in last 7 days
-    today = date.today()
-    last_week = (today - timedelta(days=6)).isoformat()
-    cur.execute("""
-        SELECT COUNT(DISTINCT date(created_at)) AS active_days
-        FROM journal_entries
-        WHERE user_id = %s AND date(created_at) >= %s
-    """, (user_id, last_week))
-    active_days = cur.fetchone()["active_days"]
+        # 2. days user journaled in last 7 days
+        today = date.today()
+        last_week = (today - timedelta(days=6)).isoformat()
+        cur.execute("""
+            SELECT COUNT(DISTINCT date(created_at)) AS active_days
+            FROM journal_entries
+            WHERE user_id = %s AND date(created_at) >= %s
+        """, (user_id, last_week))
+        active_days = cur.fetchone()["active_days"]
 
-    # 3. habit completions in last 7 days
-    cur.execute("""
-        SELECT COUNT(*) AS habits_done
-        FROM habit_completions hc
-        JOIN habits h ON hc.habit_id = h.id
-        WHERE h.user_id = %s AND date(hc.completed_at) >= %s
-    """, (user_id, last_week))
-    habits_done = cur.fetchone()["habits_done"]
+        # 3. habit completions in last 7 days
+        cur.execute("""
+            SELECT COUNT(*) AS habits_done
+            FROM habit_completions hc
+            JOIN habits h ON hc.habit_id = h.id
+            WHERE h.user_id = %s AND date(hc.completed_at) >= %s
+        """, (user_id, last_week))
+        habits_done = cur.fetchone()["habits_done"]
 
-    conn.close()
+        # 4. mood trend data - count each emotion per day for the chart
+        range_start = (today - timedelta(days=range_days - 1)).isoformat()
+        cur.execute("""
+            SELECT date(created_at) AS entry_date,
+                   predicted_emotion,
+                   COUNT(*) AS cnt
+            FROM journal_entries
+            WHERE user_id = %s AND date(created_at) >= %s
+            GROUP BY date(created_at), predicted_emotion
+            ORDER BY date(created_at) ASC
+        """, (user_id, range_start))
+        mood_rows = cur.fetchall()
+
+        # 5. paralysis score per entry for the score trend chart
+        cur.execute("""
+            SELECT id, paralysis_score, predicted_emotion, created_at
+            FROM journal_entries
+            WHERE user_id = %s AND date(created_at) >= %s
+                  AND paralysis_score IS NOT NULL
+            ORDER BY created_at ASC
+        """, (user_id, range_start))
+        score_rows = cur.fetchall()
+
+        # 6. behaviour state distribution for the doughnut chart
+        cur.execute("""
+            SELECT predicted_behaviour, COUNT(*) AS cnt
+            FROM journal_entries
+            WHERE user_id = %s AND date(created_at) >= %s
+                  AND predicted_behaviour IS NOT NULL
+            GROUP BY predicted_behaviour
+            ORDER BY cnt DESC
+        """, (user_id, range_start))
+        behaviour_rows = cur.fetchall()
+    finally:
+        conn.close()
+
+    # build a list of all dates in the range so the chart has no gaps
+    all_dates = []
+    for i in range(range_days):
+        d = today - timedelta(days=range_days - 1 - i)
+        all_dates.append(d.isoformat())
+
+    # all 11 emotions with their hex colours matching our CSS variables
+    emotion_colours = {
+        "overwhelmed": "#E57373",
+        "anxious": "#BA68C8",
+        "stuck": "#FFA726",
+        "stressed": "#EF5350",
+        "tired": "#64B5F6",
+        "calm": "#81C784",
+        "frustrated": "#FF7043",
+        "guilty": "#A1887F",
+        "unmotivated": "#90A4AE",
+        "hopeful": "#FFD54F",
+        "proud": "#4DB6AC",
+    }
+
+    # turn the DB rows into a lookup: {date: {emotion: count}}
+    mood_lookup = {}
+    emotions_seen = set()
+    for row in mood_rows:
+        d = str(row["entry_date"])
+        emo = row["predicted_emotion"]
+        if emo:
+            emotions_seen.add(emo)
+            if d not in mood_lookup:
+                mood_lookup[d] = {}
+            mood_lookup[d][emo] = row["cnt"]
+
+    # build one dataset per emotion that actually appeared
+    # each dataset is a list of counts, one per date in all_dates
+    chart_datasets = []
+    for emo in emotion_colours:
+        if emo not in emotions_seen:
+            continue
+        data_points = []
+        for d in all_dates:
+            data_points.append(mood_lookup.get(d, {}).get(emo, 0))
+        chart_datasets.append({
+            "label": emo.capitalize(),
+            "data": data_points,
+            "borderColor": emotion_colours[emo],
+            "backgroundColor": emotion_colours[emo] + "33",
+            "tension": 0.3,
+            "fill": False,
+            "pointRadius": 3,
+            "pointHoverRadius": 6,
+        })
+
+    # format the date labels for the chart (shorter for readability)
+    chart_labels = []
+    for d in all_dates:
+        # turn 2026-03-24 into "Mar 24"
+        parts = d.split("-")
+        month_names = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                       "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+        chart_labels.append(f"{month_names[int(parts[1])]} {int(parts[2])}")
+
+    # build paralysis score chart data
+    # each entry is a point on the line, x = label like "Mar 24 #3", y = score
+    ps_labels = []
+    ps_scores = []
+    ps_emotions = []
+    for row in score_rows:
+        # format as "Mar 24" with the entry time
+        ts = str(row["created_at"])[:16]  # "2026-03-24T14:30"
+        date_part = ts[:10]
+        dp = date_part.split("-")
+        month_names = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                       "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+        label = f"{month_names[int(dp[1])]} {int(dp[2])}"
+        # add time if available so entries on the same day are distinguishable
+        if len(ts) > 10:
+            label += f" {ts[11:16]}"
+        ps_labels.append(label)
+        ps_scores.append(round(float(row["paralysis_score"]), 1))
+        ps_emotions.append(row["predicted_emotion"])
+
+    has_ps_data = len(ps_scores) > 0
+
+    # build behaviour state doughnut chart data
+    # colours match the behaviour badge gradients from calm.css
+    behaviour_colours = {
+        "avoidance": "#E57373",
+        "overwhelm": "#BA68C8",
+        "rumination": "#FFB74D",
+        "recovery": "#64B5F6",
+        "action": "#66BB6A",
+        "completion": "#4DB6AC",
+    }
+
+    bh_labels = []
+    bh_counts = []
+    bh_colors = []
+    bh_total = 0
+    for row in behaviour_rows:
+        bh = row["predicted_behaviour"]
+        cnt = row["cnt"]
+        bh_labels.append(bh.capitalize())
+        bh_counts.append(cnt)
+        bh_colors.append(behaviour_colours.get(bh, "#90A4AE"))
+        bh_total += cnt
+
+    has_bh_data = bh_total > 0
 
     return render_template(
         "analytics.html",
         emotion_data=emotion_data,
         active_days=active_days,
-        habits_done=habits_done
+        habits_done=habits_done,
+        chart_labels=json.dumps(chart_labels),
+        chart_datasets=json.dumps(chart_datasets),
+        chart_range=chart_range,
+        has_mood_data=len(emotions_seen) > 0,
+        ps_labels=json.dumps(ps_labels),
+        ps_scores=json.dumps(ps_scores),
+        ps_emotions=json.dumps(ps_emotions),
+        has_ps_data=has_ps_data,
+        bh_labels=json.dumps(bh_labels),
+        bh_counts=json.dumps(bh_counts),
+        bh_colors=json.dumps(bh_colors),
+        bh_total=bh_total,
+        has_bh_data=has_bh_data,
     )
 
 

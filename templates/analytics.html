@@ -112,6 +112,124 @@
             {% endif %}
         </div>
 
+        <!-- mood trend chart -->
+        <div class="card fade-in-up" style="margin-top: var(--space-lg);">
+            <h2>Mood over time</h2>
+            <p class="section-subtitle" style="margin-bottom: 12px;">
+                How your emotions have shifted across your reflections.
+            </p>
+            <details class="psych-explainer">
+                <summary>Why this works</summary>
+                <p>Seeing emotional patterns over days and weeks helps your brain notice shifts it cannot detect in the moment. This builds self-awareness, which is the first stage of change.</p>
+            </details>
+
+            <!-- range selector -->
+            <div class="chart-range-selector" style="margin: 16px 0;">
+                <a href="{{ url_for('analytics', range='7') }}"
+                   class="chart-range-btn {{ 'chart-range-active' if chart_range == '7' }}">7 days</a>
+                <a href="{{ url_for('analytics', range='14') }}"
+                   class="chart-range-btn {{ 'chart-range-active' if chart_range == '14' }}">14 days</a>
+                <a href="{{ url_for('analytics', range='30') }}"
+                   class="chart-range-btn {{ 'chart-range-active' if chart_range == '30' }}">30 days</a>
+            </div>
+
+            {% if has_mood_data %}
+            <div class="chart-container">
+                <canvas id="moodTrendChart"></canvas>
+            </div>
+            {% else %}
+            <div class="empty-state-enhanced">
+                <p>Mood trends will appear here after your first few reflections.</p>
+                <p style="margin-top: 8px;">
+                    <a href="{{ url_for('journal') }}" class="btn-text">Start reflecting</a>
+                </p>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- paralysis score trend chart -->
+        <div class="card fade-in-up" style="margin-top: var(--space-lg);">
+            <h2>Paralysis score over time</h2>
+            <p class="section-subtitle" style="margin-bottom: 12px;">
+                Tracking where you sit between flow and freeze across your reflections.
+            </p>
+            <details class="psych-explainer">
+                <summary>Why this works</summary>
+                <p>Procrastination paralysis is not a fixed state. Your score moves throughout the day and across weeks. Seeing a downward trend is evidence that your identity work and tiny actions are shifting your nervous system out of freeze mode.</p>
+            </details>
+
+            <!-- uses the same range as the mood chart -->
+            <div class="chart-range-selector" style="margin: 16px 0;">
+                <a href="{{ url_for('analytics', range='7') }}"
+                   class="chart-range-btn {{ 'chart-range-active' if chart_range == '7' }}">7 days</a>
+                <a href="{{ url_for('analytics', range='14') }}"
+                   class="chart-range-btn {{ 'chart-range-active' if chart_range == '14' }}">14 days</a>
+                <a href="{{ url_for('analytics', range='30') }}"
+                   class="chart-range-btn {{ 'chart-range-active' if chart_range == '30' }}">30 days</a>
+            </div>
+
+            {% if has_ps_data %}
+            <!-- zone legend -->
+            <div class="ps-zone-legend">
+                <span class="ps-zone-label ps-zone-green">In flow (negative)</span>
+                <span class="ps-zone-label ps-zone-neutral">Neutral (0)</span>
+                <span class="ps-zone-label ps-zone-red">Frozen (positive)</span>
+            </div>
+            <div class="chart-container">
+                <canvas id="paralysisScoreChart"></canvas>
+            </div>
+            {% else %}
+            <div class="empty-state-enhanced">
+                <p>Your paralysis score trend will appear here after your first few reflections.</p>
+                <p style="margin-top: 8px;">
+                    <a href="{{ url_for('journal') }}" class="btn-text">Start reflecting</a>
+                </p>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- behaviour state distribution doughnut -->
+        <div class="card fade-in-up" style="margin-top: var(--space-lg);">
+            <h2>Where your energy goes</h2>
+            <p class="section-subtitle" style="margin-bottom: 12px;">
+                How your behaviour patterns break down across your reflections.
+                Over time, the balance should shift from avoidance toward action.
+            </p>
+            <details class="psych-explainer">
+                <summary>Why this works</summary>
+                <p>Most people in procrastination paralysis believe they are always avoiding. But the data often shows pockets of action, recovery and completion that the brain dismisses. Seeing the actual breakdown challenges that "all or nothing" thinking.</p>
+            </details>
+
+            <!-- range selector synced with other charts -->
+            <div class="chart-range-selector" style="margin: 16px 0;">
+                <a href="{{ url_for('analytics', range='7') }}"
+                   class="chart-range-btn {{ 'chart-range-active' if chart_range == '7' }}">7 days</a>
+                <a href="{{ url_for('analytics', range='14') }}"
+                   class="chart-range-btn {{ 'chart-range-active' if chart_range == '14' }}">14 days</a>
+                <a href="{{ url_for('analytics', range='30') }}"
+                   class="chart-range-btn {{ 'chart-range-active' if chart_range == '30' }}">30 days</a>
+            </div>
+
+            {% if has_bh_data %}
+            <div class="doughnut-chart-wrapper">
+                <div class="doughnut-chart-container">
+                    <canvas id="behaviourDoughnutChart"></canvas>
+                </div>
+                <div class="doughnut-total">
+                    <span class="doughnut-total-number">{{ bh_total }}</span>
+                    <span class="doughnut-total-label">entries</span>
+                </div>
+            </div>
+            {% else %}
+            <div class="empty-state-enhanced">
+                <p>Behaviour patterns will appear here after your first few reflections.</p>
+                <p style="margin-top: 8px;">
+                    <a href="{{ url_for('journal') }}" class="btn-text">Start reflecting</a>
+                </p>
+            </div>
+            {% endif %}
+        </div>
+
         <div style="margin-top: 40px;">
             <a href="{{ url_for('today') }}" class="btn-text">Return to your space</a>
         </div>
@@ -119,6 +237,9 @@
     </main>
 
 </div>
+
+<!-- Chart.js from CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 
 <!-- cursor glow effect -->
 <div class="cursor-glow" id="cursorGlow"></div>
@@ -144,6 +265,288 @@
     }
     animate();
 })();
+
+// mood trend chart - only render if the canvas exists
+var moodCanvas = document.getElementById('moodTrendChart');
+if (moodCanvas) {
+    var labels = {{ chart_labels | safe }};
+    var datasets = {{ chart_datasets | safe }};
+
+    new Chart(moodCanvas, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: datasets
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+                mode: 'index',
+                intersect: false
+            },
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        padding: 16,
+                        usePointStyle: true,
+                        pointStyle: 'circle',
+                        font: {
+                            family: "'Inter', sans-serif",
+                            size: 12
+                        }
+                    }
+                },
+                tooltip: {
+                    backgroundColor: 'rgba(31, 31, 31, 0.9)',
+                    titleFont: { family: "'Inter', sans-serif" },
+                    bodyFont: { family: "'Inter', sans-serif" },
+                    padding: 12,
+                    cornerRadius: 8,
+                    callbacks: {
+                        // only show emotions that have a count > 0 in the tooltip
+                        label: function(context) {
+                            if (context.raw === 0) return null;
+                            return context.dataset.label + ': ' + context.raw;
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    grid: { display: false },
+                    ticks: {
+                        font: { family: "'Inter', sans-serif", size: 11 },
+                        color: '#888',
+                        maxRotation: 45,
+                        autoSkip: true,
+                        maxTicksLimit: 15
+                    }
+                },
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        stepSize: 1,
+                        font: { family: "'Inter', sans-serif", size: 11 },
+                        color: '#888'
+                    },
+                    grid: {
+                        color: 'rgba(0, 0, 0, 0.04)'
+                    },
+                    title: {
+                        display: true,
+                        text: 'Times felt',
+                        font: { family: "'Inter', sans-serif", size: 12 },
+                        color: '#888'
+                    }
+                }
+            }
+        }
+    });
+}
+
+// paralysis score chart - line with green/red zones
+var psCanvas = document.getElementById('paralysisScoreChart');
+if (psCanvas) {
+    var psLabels = {{ ps_labels | safe }};
+    var psScores = {{ ps_scores | safe }};
+    var psEmotions = {{ ps_emotions | safe }};
+
+    // custom plugin to draw green and red background zones
+    var zonePlugin = {
+        id: 'paralysisZones',
+        beforeDraw: function(chart) {
+            var ctx = chart.ctx;
+            var yAxis = chart.scales.y;
+            var xAxis = chart.scales.x;
+            var chartArea = chart.chartArea;
+
+            // green zone: from -5 up to 0 (productive)
+            var yZero = yAxis.getPixelForValue(0);
+            var yBottom = yAxis.getPixelForValue(-5);
+            ctx.fillStyle = 'rgba(129, 199, 132, 0.10)';
+            ctx.fillRect(chartArea.left, yZero, chartArea.right - chartArea.left, yBottom - yZero);
+
+            // red zone: from 0 up to +5 (paralysis)
+            var yTop = yAxis.getPixelForValue(5);
+            ctx.fillStyle = 'rgba(229, 115, 115, 0.10)';
+            ctx.fillRect(chartArea.left, yTop, chartArea.right - chartArea.left, yZero - yTop);
+
+            // zero line - slightly darker
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.15)';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([4, 4]);
+            ctx.beginPath();
+            ctx.moveTo(chartArea.left, yZero);
+            ctx.lineTo(chartArea.right, yZero);
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+    };
+
+    // colour each point by its score - green for negative, red for positive
+    var pointColours = psScores.map(function(s) {
+        if (s <= -2) return '#4CAF50';
+        if (s < 0) return '#81C784';
+        if (s === 0) return '#90A4AE';
+        if (s <= 2) return '#EF9A9A';
+        return '#E57373';
+    });
+
+    new Chart(psCanvas, {
+        type: 'line',
+        data: {
+            labels: psLabels,
+            datasets: [{
+                label: 'Paralysis score',
+                data: psScores,
+                borderColor: '#78909C',
+                backgroundColor: 'rgba(120, 144, 156, 0.1)',
+                tension: 0.3,
+                fill: false,
+                pointRadius: 5,
+                pointHoverRadius: 8,
+                pointBackgroundColor: pointColours,
+                pointBorderColor: pointColours,
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: 'rgba(31, 31, 31, 0.9)',
+                    titleFont: { family: "'Inter', sans-serif" },
+                    bodyFont: { family: "'Inter', sans-serif" },
+                    padding: 12,
+                    cornerRadius: 8,
+                    callbacks: {
+                        label: function(context) {
+                            var score = context.raw;
+                            var emo = psEmotions[context.dataIndex] || '';
+                            var zone = '';
+                            if (score <= -3) zone = 'In flow';
+                            else if (score <= -1) zone = 'Moving well';
+                            else if (score <= 1) zone = 'Neutral';
+                            else if (score <= 3) zone = 'Building up';
+                            else zone = 'High paralysis';
+                            return 'Score: ' + score + ' (' + zone + ') - ' + emo;
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    grid: { display: false },
+                    ticks: {
+                        font: { family: "'Inter', sans-serif", size: 11 },
+                        color: '#888',
+                        maxRotation: 45,
+                        autoSkip: true,
+                        maxTicksLimit: 15
+                    }
+                },
+                y: {
+                    min: -5,
+                    max: 5,
+                    ticks: {
+                        stepSize: 1,
+                        font: { family: "'Inter', sans-serif", size: 11 },
+                        color: '#888',
+                        callback: function(value) {
+                            if (value === -5) return '-5 (flow)';
+                            if (value === 0) return '0';
+                            if (value === 5) return '+5 (frozen)';
+                            return value;
+                        }
+                    },
+                    grid: {
+                        color: function(context) {
+                            if (context.tick.value === 0) return 'rgba(0, 0, 0, 0.15)';
+                            return 'rgba(0, 0, 0, 0.04)';
+                        }
+                    }
+                }
+            }
+        },
+        plugins: [zonePlugin]
+    });
+}
+
+// behaviour state doughnut chart
+var bhCanvas = document.getElementById('behaviourDoughnutChart');
+if (bhCanvas) {
+    var bhLabels = {{ bh_labels | safe }};
+    var bhCounts = {{ bh_counts | safe }};
+    var bhColors = {{ bh_colors | safe }};
+    var bhTotal = {{ bh_total }};
+
+    new Chart(bhCanvas, {
+        type: 'doughnut',
+        data: {
+            labels: bhLabels,
+            datasets: [{
+                data: bhCounts,
+                backgroundColor: bhColors,
+                borderColor: '#ffffff',
+                borderWidth: 2,
+                hoverBorderWidth: 3,
+                hoverOffset: 8
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: '55%',
+            plugins: {
+                legend: {
+                    position: 'right',
+                    labels: {
+                        padding: 16,
+                        usePointStyle: true,
+                        pointStyle: 'circle',
+                        font: {
+                            family: "'Inter', sans-serif",
+                            size: 13
+                        },
+                        // show percentage next to each label
+                        generateLabels: function(chart) {
+                            var data = chart.data;
+                            return data.labels.map(function(label, i) {
+                                var value = data.datasets[0].data[i];
+                                var pct = Math.round((value / bhTotal) * 100);
+                                return {
+                                    text: label + ' (' + pct + '%)',
+                                    fillStyle: data.datasets[0].backgroundColor[i],
+                                    strokeStyle: '#fff',
+                                    lineWidth: 2,
+                                    index: i
+                                };
+                            });
+                        }
+                    }
+                },
+                tooltip: {
+                    backgroundColor: 'rgba(31, 31, 31, 0.9)',
+                    titleFont: { family: "'Inter', sans-serif" },
+                    bodyFont: { family: "'Inter', sans-serif" },
+                    padding: 12,
+                    cornerRadius: 8,
+                    callbacks: {
+                        label: function(context) {
+                            var value = context.raw;
+                            var pct = Math.round((value / bhTotal) * 100);
+                            return context.label + ': ' + value + ' entries (' + pct + '%)';
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
 </script>
 </body>
 </html>

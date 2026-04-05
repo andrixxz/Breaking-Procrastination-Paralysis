@@ -60,7 +60,32 @@
                 <p class="pattern-label">Active habits</p>
             </div>
             {% endif %}
+            {% if week_avg_paralysis is not none %}
+            <div class="card pattern-card">
+                <p class="pattern-value">{{ week_avg_paralysis }}</p>
+                <p class="pattern-label">Avg. paralysis score</p>
+            </div>
+            {% endif %}
+            {% if week_top_emotion %}
+            <div class="card pattern-card">
+                <p class="pattern-value"><span class="emotion-badge {{ week_top_emotion }}">{{ week_top_emotion }}</span></p>
+                <p class="pattern-label">Most felt this week</p>
+            </div>
+            {% endif %}
+            {% if week_positive_shifts > 0 %}
+            <div class="card pattern-card">
+                <p class="pattern-value">{{ week_positive_shifts }}</p>
+                <p class="pattern-label">Positive shifts</p>
+            </div>
+            {% endif %}
         </div>
+
+        {% if week_top_emotion or week_positive_shifts > 0 or week_avg_paralysis is not none %}
+        <details class="psych-explainer fade-in-up" style="margin-bottom: var(--space-md);">
+            <summary>Why these numbers matter</summary>
+            <p>Your most common emotion shows where your mind has been sitting this week. Positive shifts are moments where you moved from avoidance or overwhelm into action or recovery within the same day. The paralysis score averages how stuck you felt across your entries. Tracking these patterns helps your brain notice its own progress.</p>
+        </details>
+        {% endif %}
 
         <!-- mobile day navigation - only visible on small screens -->
         <div class="week-mobile-nav" id="weekMobileNav">

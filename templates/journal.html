@@ -223,8 +223,60 @@
 
         <div class="section-header">
             <h2>Past reflections</h2>
+            {% if total_entries > 0 %}
+            <p class="section-subtitle" style="margin-top: 4px;">
+                {{ total_entries }} reflection{{ 's' if total_entries != 1 }} found
+            </p>
+            {% endif %}
         </div>
 
+        <!-- filter bar -->
+        <form method="get" action="{{ url_for('journal') }}" class="journal-filter-bar fade-in-up">
+            <div class="filter-group">
+                <label for="filter-emotion" class="filter-label">Emotion</label>
+                <select id="filter-emotion" name="emotion" class="filter-select">
+                    <option value="">All emotions</option>
+                    {% for emo in valid_emotions %}
+                    <option value="{{ emo }}" {{ 'selected' if filter_emotion == emo }}>{{ emo | capitalize }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="filter-group">
+                <label for="filter-period" class="filter-label">Time period</label>
+                <select id="filter-period" name="period" class="filter-select">
+                    <option value="">All time</option>
+                    <option value="week" {{ 'selected' if filter_period == 'week' }}>Last 7 days</option>
+                    <option value="month" {{ 'selected' if filter_period == 'month' }}>Last 30 days</option>
+                    <option value="custom" {{ 'selected' if filter_period == 'custom' }}>Custom range</option>
+                </select>
+            </div>
+
+            <div class="filter-group filter-date-range" id="dateRangeGroup" style="{{ '' if filter_period == 'custom' else 'display: none;' }}">
+                <label for="date-from" class="filter-label">From</label>
+                <input type="date" id="date-from" name="date_from" class="filter-date" value="{{ date_from }}">
+                <label for="date-to" class="filter-label">To</label>
+                <input type="date" id="date-to" name="date_to" class="filter-date" value="{{ date_to }}">
+            </div>
+
+            <div class="filter-group">
+                <label for="filter-per-page" class="filter-label">Show</label>
+                <select id="filter-per-page" name="per_page" class="filter-select filter-select-small">
+                    <option value="5" {{ 'selected' if per_page == 5 }}>5</option>
+                    <option value="10" {{ 'selected' if per_page == 10 }}>10</option>
+                    <option value="25" {{ 'selected' if per_page == 25 }}>25</option>
+                </select>
+            </div>
+
+            <div class="filter-actions">
+                <button type="submit" class="btn-gentle filter-btn">Filter</button>
+                {% if filter_emotion or filter_period or date_from or date_to %}
+                <a href="{{ url_for('journal') }}" class="btn-text filter-clear">Clear filters</a>
+                {% endif %}
+            </div>
+        </form>
+
+        <!-- entries list -->
         {% if entries %}
         <ul class="entries-list stagger-children">
             {% for entry in entries %}
@@ -283,9 +335,52 @@
             </li>
             {% endfor %}
         </ul>
+
+        <!-- pagination controls -->
+        {% if total_pages > 1 %}
+        <nav class="pagination-controls fade-in-up">
+            <div class="pagination-info">
+                Page {{ page }} of {{ total_pages }}
+            </div>
+            <div class="pagination-buttons">
+                {% if page > 1 %}
+                <a href="{{ url_for('journal', page=page-1, per_page=per_page, emotion=filter_emotion, period=filter_period, date_from=date_from, date_to=date_to) }}"
+                   class="pagination-btn">Previous</a>
+                {% else %}
+                <span class="pagination-btn pagination-btn-disabled">Previous</span>
+                {% endif %}
+
+                {% for p in range(1, total_pages + 1) %}
+                    {% if p == page %}
+                    <span class="pagination-btn pagination-btn-active">{{ p }}</span>
+                    {% elif p == 1 or p == total_pages or (p >= page - 2 and p <= page + 2) %}
+                    <a href="{{ url_for('journal', page=p, per_page=per_page, emotion=filter_emotion, period=filter_period, date_from=date_from, date_to=date_to) }}"
+                       class="pagination-btn">{{ p }}</a>
+                    {% elif p == page - 3 or p == page + 3 %}
+                    <span class="pagination-ellipsis">...</span>
+                    {% endif %}
+                {% endfor %}
+
+                {% if page < total_pages %}
+                <a href="{{ url_for('journal', page=page+1, per_page=per_page, emotion=filter_emotion, period=filter_period, date_from=date_from, date_to=date_to) }}"
+                   class="pagination-btn">Next</a>
+                {% else %}
+                <span class="pagination-btn pagination-btn-disabled">Next</span>
+                {% endif %}
+            </div>
+        </nav>
+        {% endif %}
+
+        {% elif journal_count > 0 %}
+        <!-- filters are active but no results match -->
+        <div class="empty-state-enhanced">
+            <p>No reflections match those filters.</p>
+            <p style="margin-top: 8px; font-size: 0.85rem;">
+                <a href="{{ url_for('journal') }}" class="btn-text">Clear filters</a> to see all your entries.
+            </p>
+        </div>
         {% else %}
         <div class="empty-state-enhanced">
-            <div class="empty-state-icon">✍️</div>
             <p>Your first reflection will appear here when you are ready.</p>
             <p style="margin-top: 8px; font-size: 0.85rem;">Take your time. There is no pressure to start.</p>
         </div>
@@ -345,6 +440,19 @@ document.querySelectorAll('[data-confirm]').forEach(function(btn) {
         }
     });
 });
+
+// show/hide the date range inputs when period changes
+var periodSelect = document.getElementById('filter-period');
+var dateRangeGroup = document.getElementById('dateRangeGroup');
+if (periodSelect && dateRangeGroup) {
+    periodSelect.addEventListener('change', function() {
+        if (this.value === 'custom') {
+            dateRangeGroup.style.display = '';
+        } else {
+            dateRangeGroup.style.display = 'none';
+        }
+    });
+}
 </script>
 <script nonce="{{ csp_nonce() }}">
 (function() {

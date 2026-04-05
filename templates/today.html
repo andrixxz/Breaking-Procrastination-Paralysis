@@ -77,6 +77,18 @@
         </div>
         {% endif %}
 
+        <!-- daily insight from temporal analysis -->
+        {% if daily_insight %}
+        <div class="daily-insight {{ daily_insight.css_class }} fade-in-up">
+            <p class="daily-insight-label">Today's insight</p>
+            <p class="daily-insight-text">{{ daily_insight.message }}</p>
+            <details class="psych-explainer">
+                <summary>Why this works</summary>
+                <p>Tracking how your emotions shift across a single day helps you see patterns your brain usually hides. Naming transitions builds self-awareness and strengthens the neural pathways for emotional regulation.</p>
+            </details>
+        </div>
+        {% endif %}
+
         <!-- win acknowledgment (shown immediately after completing an action) -->
         {% if step_done %}
         <div class="win-card fade-in-up">

@@ -63,6 +63,17 @@
             <div class="card pattern-card">
                 <p class="pattern-value">{{ total_entries }}</p>
                 <p class="pattern-label">Reflections</p>
+                {% if comparison and comparison.entries %}
+                <p class="pattern-compare pattern-compare-{{ comparison.entries }}">
+                    {% if comparison.entries == 'up' %}
+                    <span class="compare-arrow compare-arrow-up"></span> up from {{ comparison.entries_prev }}
+                    {% elif comparison.entries == 'down' %}
+                    <span class="compare-arrow compare-arrow-down"></span> down from {{ comparison.entries_prev }}
+                    {% else %}
+                    same as last month
+                    {% endif %}
+                </p>
+                {% endif %}
             </div>
             <div class="card pattern-card">
                 <p class="pattern-value">{{ days_journaled }}</p>
@@ -71,14 +82,55 @@
             <div class="card pattern-card">
                 <p class="pattern-value">{{ total_habits_completed }}</p>
                 <p class="pattern-label">Habits completed</p>
+                {% if comparison and comparison.habits %}
+                <p class="pattern-compare pattern-compare-{{ comparison.habits }}">
+                    {% if comparison.habits == 'up' %}
+                    <span class="compare-arrow compare-arrow-up"></span> up from {{ comparison.habits_prev }}
+                    {% elif comparison.habits == 'down' %}
+                    <span class="compare-arrow compare-arrow-down"></span> down from {{ comparison.habits_prev }}
+                    {% else %}
+                    same as last month
+                    {% endif %}
+                </p>
+                {% endif %}
             </div>
             {% if avg_paralysis is not none %}
             <div class="card pattern-card">
                 <p class="pattern-value">{{ avg_paralysis }}</p>
                 <p class="pattern-label">Avg. paralysis score</p>
+                {% if comparison and comparison.paralysis %}
+                <p class="pattern-compare pattern-compare-{{ comparison.paralysis }}">
+                    {% if comparison.paralysis == 'improved' %}
+                    <span class="compare-arrow compare-arrow-down"></span> down from {{ comparison.paralysis_prev }} - that is progress
+                    {% elif comparison.paralysis == 'worsened' %}
+                    <span class="compare-arrow compare-arrow-up"></span> up from {{ comparison.paralysis_prev }}
+                    {% else %}
+                    same as last month
+                    {% endif %}
+                </p>
+                {% endif %}
+            </div>
+            {% endif %}
+            {% if month_top_emotion %}
+            <div class="card pattern-card">
+                <p class="pattern-value"><span class="emotion-badge {{ month_top_emotion }}">{{ month_top_emotion }}</span></p>
+                <p class="pattern-label">Most felt this month</p>
+            </div>
+            {% endif %}
+            {% if month_positive_shifts > 0 %}
+            <div class="card pattern-card">
+                <p class="pattern-value">{{ month_positive_shifts }}</p>
+                <p class="pattern-label">Positive shifts</p>
             </div>
             {% endif %}
         </div>
+
+        {% if month_top_emotion or month_positive_shifts > 0 or comparison %}
+        <details class="psych-explainer fade-in-up" style="margin-bottom: var(--space-md);">
+            <summary>Why these numbers matter</summary>
+            <p>Seeing a whole month helps you notice patterns that are invisible day to day. Your most common emotion reveals where your mind has been settling. Positive shifts count the times you moved from avoidance or overwhelm into action within the same day. Comparing to last month lets you see real change happening, even when it feels slow.</p>
+        </details>
+        {% endif %}
 
         <!-- calendar grid -->
         <div class="month-calendar fade-in-up">
