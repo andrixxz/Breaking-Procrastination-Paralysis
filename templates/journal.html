@@ -22,12 +22,12 @@
 
     <!-- navigation -->
     <nav class="page-nav">
-        <a href="{{ url_for('dashboard') }}" class="nav-brand">Breaking Procrastination Paralysis</a>
+        <a href="{{ url_for('dashboard') }}" class="nav-brand"><svg class="nav-home-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg> Breaking Procrastination Paralysis</a>
         <ul class="nav-links">
             <li><a href="{{ url_for('today') }}">Today</a></li>
-            <li><a href="{{ url_for('journal') }}" class="active">Reflect</a></li>
-            <li><a href="{{ url_for('habits') }}">Tiny Steps</a></li>
-            <li><a href="{{ url_for('goals_page') }}">Intentions</a></li>
+            <li><a href="{{ url_for('journal') }}" class="active">Journal</a></li>
+            <li><a href="{{ url_for('habits') }}">Habits</a></li>
+            <li><a href="{{ url_for('goals_page') }}">Goals</a></li>
             <li><a href="{{ url_for('week') }}">Week</a></li>
             <li><a href="{{ url_for('month') }}">Month</a></li>
             <li><a href="{{ url_for('analytics') }}">Patterns</a></li>
@@ -284,7 +284,7 @@
                 <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; width: 100%;">
                     <div class="entry-content">
                         <div class="entry-meta">
-                            <span>{{ entry["created_at"][:16] }}</span>
+                            <span>{{ entry["created_at"]|format_datetime }}</span>
                             <span class="emotion-badge {{ entry['predicted_emotion'] }}">{{ entry["predicted_emotion"] }}</span>
                             {% if entry["predicted_behaviour"] %}
                             <span class="behaviour-badge {{ entry['predicted_behaviour'] }}">{{ entry["predicted_behaviour"] }}</span>

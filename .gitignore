@@ -5,3 +5,6 @@ __pycache__/
 *.db
 *.db-shm
 *.db-wal
+backup_before_fixes/
+.coverage
+htmlcov/

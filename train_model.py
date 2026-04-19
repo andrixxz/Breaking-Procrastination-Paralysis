@@ -1,7 +1,6 @@
 # train_model.py - emotion classifier for journal entries
 # expanded from 6 to 11 emotion classes for Phase 2 ML upgrade
-# classes: overwhelmed, anxious, stuck, stressed, tired, calm,
-#          frustrated, guilty, unmotivated, hopeful, proud
+# classes: overwhelmed, anxious, stuck, stressed, tired, calm, frustrated, guilty, unmotivated, hopeful and proud
 # each class has 25 training samples (275 total)
 
 import joblib

@@ -15,6 +15,10 @@
 <body>
 <div class="page-wrapper">
 
+    <div style="text-align: right; padding: 16px 24px 0;">
+        <a href="{{ url_for('logout') }}" style="font-size: 0.8rem; color: var(--text-muted); text-decoration: none;">Log out</a>
+    </div>
+
     <main class="page-content" style="max-width: 700px; margin: 0 auto; padding-top: 60px;">
 
         <!-- Progress Indicator -->
@@ -31,8 +35,26 @@
             <h1 class="section-title">Rewrite as identity beliefs</h1>
             <p class="section-subtitle">
                 Turn each intention into an identity statement using "I am" language.<br>
-                Example: "Finish my project" → "I am someone who follows through on commitments."
+                This is about who you are becoming, not what you need to do.
             </p>
+
+            <div class="card" style="margin-top: 20px; margin-bottom: 20px; padding: 20px; background: rgba(139, 195, 148, 0.06); border-left: 3px solid var(--sage-green);">
+                <p style="font-weight: 500; margin-bottom: 10px; color: var(--text-primary); font-size: 0.92rem;">Fill-in-the-blank template:</p>
+                <p style="font-style: italic; color: var(--sage-green-dark, #5a7a5a); margin-bottom: 12px; font-size: 0.95rem;">
+                    "I am someone who ___."
+                </p>
+                <p style="color: var(--text-secondary); font-size: 0.85rem; line-height: 1.6; margin-bottom: 16px;">
+                    Write it as if it is already true. Say "I am" not "I will" or "I want to." You are telling your brain this is who I am now, not who I hope to become.
+                </p>
+                <p style="font-weight: 500; margin-bottom: 8px; color: var(--text-primary); font-size: 0.88rem;">Examples:</p>
+                <ul style="color: var(--text-secondary); font-size: 0.85rem; line-height: 1.8; padding-left: 18px; margin: 0;">
+                    <li>"Get fit" → "I am someone who moves their body regularly."</li>
+                    <li>"Finish my project" → "I am someone who follows through on commitments."</li>
+                    <li>"Read more" → "I am someone who makes time for learning."</li>
+                    <li>"Eat healthier" → "I am someone who nourishes my body."</li>
+                </ul>
+            </div>
+
             <details class="psych-explainer">
                 <summary>Why this works</summary>
                 <p>When you rewrite an intention as an identity statement, you begin shifting what your subconscious looks for as evidence. Your brain starts noticing proof that the new belief is true.</p>

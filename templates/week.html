@@ -16,12 +16,12 @@
 <div class="page-wrapper">
 
     <nav class="page-nav">
-        <a href="{{ url_for('dashboard') }}" class="nav-brand">Breaking Procrastination Paralysis</a>
+        <a href="{{ url_for('dashboard') }}" class="nav-brand"><svg class="nav-home-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg> Breaking Procrastination Paralysis</a>
         <ul class="nav-links">
             <li><a href="{{ url_for('today') }}">Today</a></li>
-            <li><a href="{{ url_for('journal') }}">Reflect</a></li>
-            <li><a href="{{ url_for('habits') }}">Tiny Steps</a></li>
-            <li><a href="{{ url_for('goals_page') }}">Intentions</a></li>
+            <li><a href="{{ url_for('journal') }}">Journal</a></li>
+            <li><a href="{{ url_for('habits') }}">Habits</a></li>
+            <li><a href="{{ url_for('goals_page') }}">Goals</a></li>
             <li><a href="{{ url_for('week') }}" class="active">Week</a></li>
             <li><a href="{{ url_for('month') }}">Month</a></li>
             <li><a href="{{ url_for('analytics') }}">Patterns</a></li>
@@ -148,6 +148,7 @@
                         <form method="post" action="{{ url_for('toggle_goal_step', step_id=step['id']) }}" class="week-task-form">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                             <input type="hidden" name="redirect" value="week">
+                            <input type="hidden" name="completion_date" value="{{ day.date }}">
                             <button type="submit" class="week-task-check-done" title="Undo" style="cursor: pointer; border: none; background: none;">&#10003;</button>
                         </form>
                         <div class="week-task-content">
@@ -164,6 +165,7 @@
                         <form method="post" action="{{ url_for('toggle_goal_step', step_id=step['id']) }}" class="week-task-form">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                             <input type="hidden" name="redirect" value="week">
+                            <input type="hidden" name="completion_date" value="{{ day.date }}">
                             <button type="submit" class="week-task-check" title="Mark done"></button>
                         </form>
                         <div class="week-task-content">
@@ -229,7 +231,7 @@
 
         <!-- undated tasks -->
         {% if undated_todos %}
-        <div class="card fade-in-up" style="padding: 24px;">
+        <div class="card fade-in-up" style="padding: 24px; margin-top: 20px;">
             <h2>Unscheduled</h2>
             <p class="section-subtitle" style="margin-bottom: 16px;">
                 Tasks without a date. Do them whenever feels right.
@@ -240,7 +242,7 @@
                     <form method="post" action="{{ url_for('toggle_todo', todo_id=todo['id']) }}" style="display: flex; align-items: center; gap: 12px;">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                         <input type="hidden" name="redirect" value="week">
-                        <button type="submit" class="habit-checkbox" style="border: none; cursor: pointer;"></button>
+                        <button type="submit" class="habit-checkbox" style="cursor: pointer;"></button>
                         <span class="habit-label">{{ todo['text'] }}</span>
                     </form>
                 </li>

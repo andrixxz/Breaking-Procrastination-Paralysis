@@ -100,6 +100,32 @@ talisman = Talisman(
     content_security_policy_nonce_in=['script-src'],
 )
 
+
+# jinja filters so templates can format dates nicely
+@app.template_filter('format_date')
+def format_date_filter(value):
+    """turns 2026-04-19 into 19/04/2026"""
+    if not value:
+        return value
+    try:
+        d = datetime.strptime(str(value)[:10], '%Y-%m-%d')
+        return d.strftime('%d/%m/%Y')
+    except (ValueError, TypeError):
+        return value
+
+
+@app.template_filter('format_datetime')
+def format_datetime_filter(value):
+    """turns 2026-04-19T01:16:00 into 19 Apr 2026, 01:16"""
+    if not value:
+        return value
+    try:
+        dt = datetime.fromisoformat(str(value))
+        return dt.strftime('%d %b %Y, %H:%M')
+    except (ValueError, TypeError):
+        return value
+
+
 # file paths
 BASE_DIR = os.path.dirname(__file__)
 MODEL_DIR = os.path.join(BASE_DIR, "models") # where ML model + vectorizer are stored
@@ -191,13 +217,13 @@ def get_db_connection(rls_user_id=None):
 
         # tell postgres which user this connection is for
         # RLS policies check this variable so users only see their own data
-        # if no user is set (like on login page), queries to RLS tables return nothing
+        # if no user is set like on login page then queries to RLS tables return nothing
         uid = rls_user_id
         if uid is None:
             try:
                 uid = session.get('user_id')
             except RuntimeError:
-                # not inside a flask request context (e.g. startup code)
+                # not inside a flask request context (startup code)
                 uid = None
 
         if uid is not None:
@@ -537,7 +563,7 @@ def onboarding_check(f):
         if 'user_id' not in session:
             return redirect(url_for('landing'))
 
-        # Check if onboarding is complete
+        # check if onboarding is complete
         user_id = session['user_id']
         conn = get_db_connection()
         try:
@@ -546,7 +572,7 @@ def onboarding_check(f):
             user = cur.fetchone()
 
             if user and user['onboarding_complete'] == 0:
-                # Determine which onboarding step to redirect to
+                # determine which onboarding step to redirect to
                 return redirect(get_next_onboarding_step(user_id))
         finally:
             conn.close()
@@ -561,39 +587,39 @@ def get_next_onboarding_step(user_id):
     try:
         cur = conn.cursor()
 
-        # Check if goals exist
+        # check if goals exist
         cur.execute("SELECT COUNT(*) as count FROM goals WHERE user_id = %s", (user_id,))
         goals_count = cur.fetchone()['count']
         if goals_count == 0:
             return url_for('onboarding_goals')
 
-        # Check if beliefs exist
+        # check if beliefs exist
         cur.execute("SELECT COUNT(*) as count FROM identity_beliefs WHERE user_id = %s", (user_id,))
         beliefs_count = cur.fetchone()['count']
         if beliefs_count == 0:
             return url_for('onboarding_beliefs')
 
-        # Check if thoughts exist
+        # check if thoughts exist
         cur.execute("SELECT COUNT(*) as count FROM positive_thoughts WHERE user_id = %s", (user_id,))
         thoughts_count = cur.fetchone()['count']
         if thoughts_count == 0:
             return url_for('onboarding_thoughts')
 
-        # Check if custom habits exist (non-sample)
+        # check if custom habits exist (non-sample)
         cur.execute("SELECT COUNT(*) as count FROM habits WHERE user_id = %s AND is_sample = 0", (user_id,))
         habits_count = cur.fetchone()['count']
 
         if habits_count == 0:
             return url_for('onboarding_habits')
 
-        # Check if goal steps exist (at least one step across all goals)
+        # check if goal steps exist (at least one step across all goals)
         cur.execute("SELECT COUNT(*) as count FROM goal_steps WHERE user_id = %s", (user_id,))
         steps_count = cur.fetchone()['count']
 
         if steps_count == 0:
             return url_for('onboarding_steps')
 
-        # All steps complete - shouldn't reach here
+        # all steps complete - shouldn't reach here
         return url_for('today')
     finally:
         conn.close()
@@ -619,9 +645,8 @@ def sanitize_input(text):
         return text
     # tags=[] means allow no html tags at all, strip=True removes them instead of escaping
     cleaned = bleach.clean(text, tags=[], attributes={}, strip=True)
-    # bleach escapes & and < into html entities like &amp; and &lt;
-    # but jinja2 also auto-escapes on output, so that would double-escape
-    # unescape here so normal text displays correctly - jinja2 handles output safety
+    # unescape so normal text displays correctly
+    # jinja2 handles output safety on its own
     return html_module.unescape(cleaned)
 
 
@@ -653,9 +678,9 @@ def predict_behaviour(text: str) -> str:
 
 
 # -- Paralysis Score Algorithm (Task 2.4) --
-# Combines behaviour state, emotion, keyword signals and daily frequency
-# into a single score that quantifies how frozen the user is.
-# Negative = productive/flowing, Positive = paralysed/stuck.
+# combines behaviour state, emotion, keyword signals and daily frequency
+# into a single score that quantifies how frozen the user is
+# Negative = productive/flowing, Positive = paralysed/stuck
 
 # Behaviour state contribution to paralysis score
 BEHAVIOUR_WEIGHTS = {
@@ -682,7 +707,7 @@ EMOTION_WEIGHTS = {
     "proud": -2,
 }
 
-# Words that signal deeper paralysis when present in journal text
+# words that signal deeper paralysis when present in journal text
 PARALYSIS_KEYWORDS = ["can't", "never", "always", "hate", "impossible"]
 
 
@@ -699,16 +724,16 @@ def calculate_paralysis_score(emotion, behaviour, entry_text, user_id):
 
     raw_score = 0.0
 
-    # 1. Behaviour state weight (skip if model unavailable)
+    # 1. behaviour state weight (skip if model unavailable)
     if behaviour and behaviour in BEHAVIOUR_WEIGHTS:
         raw_score += BEHAVIOUR_WEIGHTS[behaviour]
 
-    # 2. Emotion weight
+    # 2. emotion weight
     if emotion in EMOTION_WEIGHTS:
         raw_score += EMOTION_WEIGHTS[emotion]
     # Edge case: unknown emotion label - treat as neutral (0)
 
-    # 3. Keyword boost - presence of paralysis-signalling words
+    # 3. keyword boost - presence of paralysis-signalling words
     # +1 per keyword found, capped at +3
     text_lower = entry_text.lower()
     keyword_count = 0
@@ -718,8 +743,8 @@ def calculate_paralysis_score(emotion, behaviour, entry_text, user_id):
     keyword_boost = min(keyword_count, 3)
     raw_score += keyword_boost
 
-    # 4. Frequency factor - 3rd+ negative entry today means stuck in a loop
-    # Negative states are emotions with weight >= 1 or behaviours of avoidance/overwhelm/rumination
+    # 4. frequency factor - 3rd+ negative entry today means stuck in a loop
+    # negative states are emotions with weight >= 1 or behaviours of avoidance/overwhelm/rumination
     negative_emotions = [e for e, w in EMOTION_WEIGHTS.items() if w >= 1]
     try:
         today_str = date.today().isoformat()
@@ -735,12 +760,12 @@ def calculate_paralysis_score(emotion, behaviour, entry_text, user_id):
         finally:
             conn.close()
 
-        # Count how many of today's previous entries had negative emotions
+        # count how many of today's previous entries had negative emotions
         negative_count = sum(
             1 for row in today_entries
             if row["predicted_emotion"] in negative_emotions
         )
-        # If this new entry is also negative, add 1 to count for the check
+        # if this new entry is also negative, add 1 to count for the check
         if emotion in negative_emotions:
             negative_count += 1
         # 3rd or more negative entry today adds +1
@@ -750,13 +775,13 @@ def calculate_paralysis_score(emotion, behaviour, entry_text, user_id):
         # Edge case: DB error during frequency check - skip this factor
         pass
 
-    # 5. Normalise to -5 to +5 range
-    # Theoretical raw range: behaviour(-3 to +3) + emotion(-2 to +2) + keywords(0 to +3) + frequency(0 to +1) = -5 to +9
-    # Without behaviour model: emotion(-2 to +2) + keywords(0 to +3) + frequency(0 to +1) = -2 to +6
-    # Clamp to -5 to +5
+    # 5. normalise to -5 to +5 range
+    # theoretical raw range: behaviour(-3 to +3) + emotion(-2 to +2) + keywords(0 to +3) + frequency(0 to +1) = -5 to +9
+    # without behaviour model: emotion(-2 to +2) + keywords(0 to +3) + frequency(0 to +1) = -2 to +6
+    # clamp to -5 to +5
     score = max(-5.0, min(5.0, raw_score))
 
-    # Round to one decimal place for clean storage and display
+    # round to one decimal place for clean storage and display
     return round(score, 1)
 
 
@@ -777,23 +802,23 @@ def get_paralysis_label(score):
 
 
 # -- Temporal Analysis (Task 2.5) --
-# Detects emotion and behaviour transitions across same-day journal entries
+# detects emotion and behaviour transitions across same-day journal entries
 # and generates a personalised insight. Aligns with supervisor feedback:
 # "Journal entries same day should relate to each other."
 
-# Emotions grouped by valence for transition detection
+# emotions grouped by valence for transition detection
 POSITIVE_EMOTIONS = {"calm", "hopeful", "proud"}
 NEGATIVE_EMOTIONS = {"overwhelmed", "anxious", "stuck", "stressed",
                      "frustrated", "guilty", "unmotivated"}
-# "tired" is neutral - not in either group
+# "tired" is neutral so not in either group
 
-# Behaviour states grouped for transition detection
+# behaviour states grouped for transition detection
 POSITIVE_BEHAVIOURS = {"action", "completion", "recovery"}
 NEGATIVE_BEHAVIOURS = {"avoidance", "overwhelm", "rumination"}
 
 # -- Belief bridge templates for three-layer reframes (Task 2.7) --
-# Each bridge connects the user's identity belief to their current
-# behaviour state, creating a personalised closing sentence in the reframe.
+# each bridge connects the user's identity belief to their current
+# behaviour state, creating a personalised closing sentence in the reframe
 BELIEF_BRIDGES_BY_BEHAVIOUR = {
     "avoidance": "Taking this small step is one way to live that out.",
     "overwhelm": "Choosing just one thing right now is how that starts.",
@@ -803,7 +828,7 @@ BELIEF_BRIDGES_BY_BEHAVIOUR = {
     "recovery": "Resting so you can return stronger is part of that.",
 }
 
-# Emotion-only bridges used when behaviour state is unavailable
+# emotion-only bridges used when behaviour state is unavailable
 BELIEF_BRIDGES_BY_EMOTION = {
     "calm": "This steadiness is part of that.",
     "hopeful": "This feeling is evidence of that.",
@@ -842,7 +867,7 @@ def get_daily_insight(user_id):
         # DB error - return no insight rather than crashing
         return None
 
-    # Need at least 2 entries to detect a transition
+    # need at least 2 entries to detect a transition
     if len(rows) < 2:
         return None
 
@@ -858,9 +883,9 @@ def get_daily_insight(user_id):
     last_emotion = emotions[-1]
     entry_count = len(rows)
 
-    # Priority 1: Detect negative loop (same negative emotion 3+ times)
+    # Priority 1: detect negative loop (same negative emotion 3+ times)
     if entry_count >= 3:
-        # Check if the most common emotion appears 3+ times and is negative
+        # check if the most common emotion appears 3+ times and is negative
         emotion_counts = {}
         for e in emotions:
             emotion_counts[e] = emotion_counts.get(e, 0) + 1
@@ -876,7 +901,7 @@ def get_daily_insight(user_id):
                 "css_class": "insight-loop",
             }
 
-    # Priority 2: Detect behaviour loop (same negative behaviour 3+ times)
+    # Priority 2: detect behaviour loop (same negative behaviour 3+ times)
     if len(behaviours) >= 3:
         behaviour_counts = {}
         for b in behaviours:
@@ -893,7 +918,7 @@ def get_daily_insight(user_id):
                 "css_class": "insight-loop",
             }
 
-    # Priority 3: Positive transition (negative -> positive emotion)
+    # Priority 3: positive transition (negative to positive emotion)
     if first_emotion in NEGATIVE_EMOTIONS and last_emotion in POSITIVE_EMOTIONS:
         return {
             "type": "positive_transition",
@@ -904,7 +929,7 @@ def get_daily_insight(user_id):
             "css_class": "insight-positive",
         }
 
-    # Priority 4: Behaviour shift (negative -> positive behaviour)
+    # Priority 4: behaviour shift (negative to positive behaviour)
     if len(behaviours) >= 2:
         first_beh = behaviours[0]
         last_beh = behaviours[-1]
@@ -918,11 +943,11 @@ def get_daily_insight(user_id):
                 "css_class": "insight-positive",
             }
 
-    # Priority 5: Paralysis score improvement (first score > last score, meaningful drop)
+    # Priority 5: paralysis score improvement (first score tp last score, meaningful drop)
     if len(scores) >= 2:
         first_score = scores[0]
         last_score = scores[-1]
-        # A drop of 2+ points is a meaningful improvement
+        # a drop of 2+ points is a meaningful improvement
         if first_score - last_score >= 2:
             return {
                 "type": "score_improvement",
@@ -933,7 +958,7 @@ def get_daily_insight(user_id):
                 "css_class": "insight-positive",
             }
 
-    # Priority 6: Emotion changed but not clearly positive or negative
+    # Priority 6: emotion changed but not clearly positive or negative
     if first_emotion != last_emotion:
         return {
             "type": "emotion_change",
@@ -944,7 +969,7 @@ def get_daily_insight(user_id):
             "css_class": "insight-neutral",
         }
 
-    # Priority 7: Multiple entries, same emotion throughout (not negative loop since < 3)
+    # Priority 7: multiple entries, same emotion throughout (not negative loop since < 3)
     if entry_count == 2 and first_emotion == last_emotion:
         if first_emotion in POSITIVE_EMOTIONS:
             return {
@@ -978,14 +1003,14 @@ def get_daily_insight(user_id):
 
 def extract_echo_phrase(text: str) -> str:
     """
-    Extract a phrase from journal entry to echo back in reframe.
-    Priority: trigger phrases > emotionally loaded clauses > first sentence fragment.
-    Max 12 words for safety.
+    Extract a phrase from the journal entry to echo back in reframe
+    Priority: trigger phrases then emotionally loaded clauses then first sentence fragment
+    Max 12 words for safety
     """
     import re
     text = text.strip()
 
-    # Stage 1: Look for specific emotional trigger patterns (verbatim)
+    # Stage 1: look for specific emotional trigger patterns (verbatim)
     trigger_patterns = [
         # Anxious triggers
         (r"(what if [^.!?]{1,60})", re.IGNORECASE),
@@ -1024,11 +1049,11 @@ def extract_echo_phrase(text: str) -> str:
         match = re.search(pattern, text, flags)
         if match:
             phrase = match.group(1).strip()
-            # Cap at 12 words for safety
+            # cap at 12 words for safety
             words = phrase.split()[:12]
             return ' '.join(words).rstrip('.,!?')
 
-    # Stage 2: Extract emotionally loaded sentence (contains emotional keywords)
+    # Stage 2: extract emotionally loaded sentence that contains emotional keywords
     emotional_keywords = [
         'overwhelmed', 'anxious', 'scared', 'worried', 'stressed', 'tired',
         'avoiding', 'procrastinating', 'stuck', 'frozen', 'paralyzed',
@@ -1039,21 +1064,21 @@ def extract_echo_phrase(text: str) -> str:
     for sentence in sentences:
         sentence = sentence.strip()
         if any(kw in sentence.lower() for kw in emotional_keywords):
-            # Extract first clause (up to comma or 10 words)
+            # extract first clause up to comma or 10 words
             clause = re.split(r',', sentence)[0].strip()
             words = clause.split()[:10]
             if len(words) >= 3:
                 return ' '.join(words).rstrip('.,!?')
 
-    # Stage 3: Fallback - first 8 words
+    # Stage 3: fallback - first 8 words
     words = text.split()[:8]
     return ' '.join(words).rstrip('.,!?')
 
 
 def select_template_index(text_lower: str, emotion: str) -> int:
     """
-    Deterministically select template index based on text features.
-    Returns 0-based index for template array.
+    Deterministically selects template index based on text features
+    Returns 0 based index for the template array
     """
     # Anxious: 5 templates
     if emotion == "anxious":
@@ -1193,7 +1218,7 @@ def generate_reframe(journal_text: str, emotion_label: str) -> str:
     text_lower = journal_text.lower()
     echo = extract_echo_phrase(journal_text)
 
-    # Map internal labels for reframe template compatibility
+    # map internal labels for reframe template compatibility
     if emotion_label == "stuck":
         emotion_label = "avoidant"
     elif emotion_label == "unmotivated":
@@ -1408,14 +1433,14 @@ def personalise_reframe(reframe, emotion, behaviour, user_id):
     Takes a base reframe (already emotion + behaviour matched) and appends
     a belief-bridge sentence that connects the user's own words to the
     suggested action.
-    Returns the enhanced reframe string, or the original if no belief found.
+    Returns the enhanced reframe string or the original if no belief found.
     """
     if not reframe:
         return reframe
 
     belief = get_belief_for_reframe(user_id)
     if not belief:
-        # No belief available - return Layer 1 + Layer 2 only
+        # no belief available - return Layer 1 + Layer 2 only
         return reframe
 
     # Edge case: sanitise belief text to prevent format string issues
@@ -1425,11 +1450,11 @@ def personalise_reframe(reframe, emotion, behaviour, user_id):
     if not safe_belief.strip():
         return reframe
 
-    # Ensure belief ends with a period for proper sentence flow
+    # add a period at the end if it doesn't have one
     if not safe_belief.endswith(('.', '!', '?')):
         safe_belief = safe_belief + '.'
 
-    # Select the appropriate bridge based on behaviour (preferred) or emotion
+    # select the appropriate bridge based on behaviour (preferred) or emotion
     bridge = None
     if behaviour and behaviour in BELIEF_BRIDGES_BY_BEHAVIOUR:
         bridge = BELIEF_BRIDGES_BY_BEHAVIOUR[behaviour]
@@ -1487,7 +1512,7 @@ def generate_micro_task(journal_text: str, emotion_label: str) -> dict:
     elif emotion_label == "unmotivated":
         emotion_label = "discouraged"
 
-    # Work-object-specific action fragments
+    # work-object-specific action fragments
     obj_actions = {
         'dissertation': {
             'open': 'Open your dissertation document',
@@ -1646,11 +1671,12 @@ def generate_micro_task(journal_text: str, emotion_label: str) -> dict:
 
 
 # Combined intervention matrix - Task 2.3
-# Maps (emotion, behaviour) to a targeted reframe + micro-task
-# selected from BOTH dimensions of the ML pipeline.
+# maps (emotion, behaviour) to a targeted reframe + micro-task
+# selected from BOTH dimensions of the ML pipeline
+
 # Template placeholders:
-#   {echo}     - phrase echoed from the user's journal text
-#   {work_obj} - detected work object (essay, report, task, etc.)
+#   {echo} - phrase echoed from the user's journal text
+#   {work_obj} - detected work object (essay, report, task, etc)
 
 INTERVENTION_MATRIX = {
 
@@ -2092,7 +2118,7 @@ def get_combined_intervention(journal_text, emotion, behaviour, user_id):
     if emotion not in valid_emotions or behaviour not in valid_behaviours:
         return None
 
-    # Extract echo phrase from journal text (with fallback)
+    # extract echo phrase from journal text (with fallback)
     try:
         echo = extract_echo_phrase(journal_text)
     except Exception:
@@ -2100,14 +2126,14 @@ def get_combined_intervention(journal_text, emotion, behaviour, user_id):
         first_sentence = journal_text.split(".")[0][:50] if journal_text else "what you wrote"
         echo = first_sentence.strip() or "what you wrote"
 
-    # Extract work object from journal text (with fallback)
+    # extract work object from journal text (with fallback)
     try:
         work_obj = extract_work_object(journal_text)
     except Exception:
         # Edge case 5: work object extraction fails
         work_obj = "task"
 
-    # Look up the (emotion, behaviour) combination in the matrix
+    # look up the (emotion, behaviour) combination in the matrix
     key = (emotion, behaviour)
     entry = INTERVENTION_MATRIX.get(key)
 
@@ -2115,7 +2141,7 @@ def get_combined_intervention(journal_text, emotion, behaviour, user_id):
     if entry is None:
         return None
 
-    # Format templates with echo phrase and work object
+    # format templates with echo phrase and work object
     try:
         reframe = entry["reframe"].format(echo=echo)
         task_text = entry["task_text"].format(work_obj=work_obj)
@@ -2124,8 +2150,8 @@ def get_combined_intervention(journal_text, emotion, behaviour, user_id):
         # Edge case 7: template formatting fails on unexpected characters
         return None
 
-    # Identity belief is now woven into the reframe by personalise_reframe()
-    # in the journal route (Task 2.7), so identity_echo is no longer needed here.
+    # identity belief is now woven into the reframe by personalise_reframe()
+    # in the journal route (Task 2.7) so identity_echo is no longer needed here
 
     return {
         "reframe": reframe,
@@ -2247,7 +2273,7 @@ def get_alignment_state(user_id):
 
 def update_alignment_score(user_id, delta: int):
     # increase or reduce score but never below zero
-    # postgres uses GREATEST(), sqlite uses MAX() for comparing two values
+    # postgres uses GREATEST() and sqlite uses MAX() for comparing two values
     clamp_fn = "GREATEST" if USE_POSTGRES else "MAX"
     conn = get_db_connection()
     try:
@@ -2690,7 +2716,7 @@ def journal():
             entry_text = None
 
         if entry_text:
-            # Step 1: Run emotion model (Model 1)
+            # Step 1: run emotion model (Model 1)
             try:
                 predicted_emotion = predict_emotion(entry_text)
             except Exception:
@@ -2698,12 +2724,12 @@ def journal():
                 predicted_emotion = None
                 error_message = "Something went wrong while reading your entry. Please try again."
 
-            # Step 2: Run behaviour model (Model 2)
+            # Step 2: run behaviour model (Model 2)
             predicted_behaviour = predict_behaviour(entry_text)
 
             # Only continue full pipeline if emotion was detected
             if predicted_emotion:
-                # Step 3: Select intervention (combined matrix or emotion-only fallback)
+                # Step 3: select intervention (combined matrix or emotion-only fallback)
                 intervention = get_combined_intervention(
                     entry_text, predicted_emotion, predicted_behaviour, user_id
                 )
@@ -2713,19 +2739,19 @@ def journal():
                     reframe = intervention['reframe']
                     micro_task = intervention['micro_task']
                 else:
-                    # Fallback to emotion-only when behaviour model unavailable
+                    # fallback to emotion-only when behaviour model unavailable
                     reframe = generate_reframe(entry_text, predicted_emotion)
                     micro_task = generate_micro_task(entry_text, predicted_emotion)
 
-                # Layer 3: Weave user's identity belief into the reframe (Task 2.7)
+                # Layer 3: weave user's identity belief into the reframe (Task 2.7)
                 reframe = personalise_reframe(
                     reframe, predicted_emotion, predicted_behaviour, user_id
                 )
 
-                # Step 4: Get personalised affirmation
+                # Step 4: get personalised affirmation
                 affirmation = get_affirmation(predicted_emotion, user_id)
 
-                # Step 5: Calculate paralysis score
+                # Step 5: calculate paralysis score
                 paralysis_score = calculate_paralysis_score(
                     predicted_emotion, predicted_behaviour, entry_text, user_id
                 )
@@ -2739,7 +2765,7 @@ def journal():
                         "why_this": "When everything else is uncertain, your breath is something you can control.",
                     }
 
-                # Step 6: Store all predictions in database
+                # Step 6: store all predictions in database
                 conn = get_db_connection()
                 try:
                     cur = conn.cursor()
@@ -2762,13 +2788,13 @@ def journal():
                 finally:
                     conn.close()
 
-                # Only update scores and fetch insight if entry was saved
+                # only update scores and fetch insight if entry was saved
                 if new_entry_id:
                     # journaling counts as identity-aligned behaviour
                     update_alignment_score(user_id, 1)
                     update_emotional_streak_for_today(user_id)
 
-                    # Step 7: Check same-day context for temporal insight
+                    # Step 7: check same-day context for temporal insight
                     # Called after save so the new entry is included
                     daily_insight = get_daily_insight(user_id)
 
@@ -2867,7 +2893,7 @@ def journal():
     finally:
         conn.close()
 
-    # Get streak for display
+    # get streak for display
     _, emotional_streak, _ = get_alignment_state(user_id)
 
     return render_template(
@@ -2934,11 +2960,11 @@ def edit_journal(entry_id):
                 # Edge case: emotion model fails on unexpected input
                 new_emotion = None
 
-            # Step 2: Run behaviour model
+            # Step 2: run behaviour model
             new_behaviour = predict_behaviour(entry_text)
 
             if new_emotion:
-                # Step 3: Select intervention (combined or fallback)
+                # Step 3: select intervention (combined or fallback)
                 edit_intervention = get_combined_intervention(
                     entry_text, new_emotion, new_behaviour, user_id
                 )
@@ -2949,12 +2975,12 @@ def edit_journal(entry_id):
                     new_reframe = generate_reframe(entry_text, new_emotion)
                     new_micro = generate_micro_task(entry_text, new_emotion)
 
-                # Layer 3: Weave user's identity belief into the edited reframe
+                # Layer 3: weave user's identity belief into the edited reframe
                 new_reframe = personalise_reframe(
                     new_reframe, new_emotion, new_behaviour, user_id
                 )
 
-                # Step 4: Recalculate paralysis score for edited entry
+                # Step 4: recalculate paralysis score for edited entry
                 new_paralysis = calculate_paralysis_score(
                     new_emotion, new_behaviour, entry_text, user_id
                 )
@@ -2967,7 +2993,7 @@ def edit_journal(entry_id):
                         "why_this": "When everything else is uncertain, your breath is something you can control.",
                     }
 
-                # Step 5: Update entry in database
+                # Step 5: update entry in database
                 try:
                     cur.execute(
                         "UPDATE journal_entries "
@@ -3030,7 +3056,7 @@ def add_todo():
         conn = get_db_connection()
         cur = conn.cursor()
 
-        # Safely convert journal_entry_id to int (handle 'None' string from forms)
+        # safely convert journal_entry_id to int (handle 'None' string from forms)
         journal_id = None
         if journal_entry_id and journal_entry_id != 'None':
             try:
@@ -3147,17 +3173,25 @@ def add_manual_todo():
     text = sanitize_input(request.form.get("todo_text", "").strip())
     due_date = request.form.get("due_date")
 
+    # default to today if no date picked
+    if not due_date:
+        due_date = date.today().isoformat()
+
     if text:
         conn = get_db_connection()
         cur = conn.cursor()
         cur.execute(
             "INSERT INTO todos (user_id, text, source, due_date, is_done, created_at) "
             "VALUES (%s, %s, 'manual', %s, 0, %s)",
-            (user_id, text, due_date if due_date else None,
+            (user_id, text, due_date,
              datetime.now().isoformat(timespec="seconds")),
         )
         conn.commit()
         conn.close()
+
+        # let the user know if the task was saved for a future date
+        if due_date > date.today().isoformat():
+            return redirect(url_for("today", future_task_saved=due_date))
 
     return redirect(url_for("today"))
 
@@ -3195,7 +3229,7 @@ def today():
     try:
         cur = conn.cursor()
 
-        # Today's todos: not done, and either no due date or due today or overdue
+        # Today's todos: not done and either no due date or due today or overdue
         cur.execute(
             "SELECT id, text, source, journal_entry_id, due_date, is_done, created_at "
             "FROM todos WHERE user_id = %s AND (is_done = 0 AND (due_date IS NULL OR due_date <= %s)) "
@@ -3204,7 +3238,7 @@ def today():
         )
         active_todos = cur.fetchall()
 
-        # Recently completed todos (done today)
+        # recently completed todos (done today)
         cur.execute(
             "SELECT id, text, source, is_done, created_at "
             "FROM todos WHERE user_id = %s AND is_done = 1 AND date(created_at) >= %s "
@@ -3266,7 +3300,7 @@ def today():
         )
         completed_habit_ids = {row['habit_id'] for row in cur.fetchall()}
 
-        # Quick weekly overview: tasks due in next 7 days
+        # quick weekly overview: tasks due in next 7 days
         week_end = (date.today() + timedelta(days=7)).isoformat()
         cur.execute(
             "SELECT COUNT(*) as count FROM todos "
@@ -3275,10 +3309,10 @@ def today():
         )
         upcoming_count = cur.fetchone()['count']
 
-        # Alignment data for greeting
+        # alignment data for greeting
         alignment_score, emotional_streak, _ = get_alignment_state(user_id)
 
-        # Daily identity belief reminder (cycles through beliefs)
+        # daily identity belief reminder (cycles through beliefs)
         cur.execute(
             "SELECT belief_text FROM identity_beliefs WHERE user_id = %s ORDER BY RANDOM() LIMIT 1",
             (user_id,),
@@ -3286,10 +3320,10 @@ def today():
         belief_row = cur.fetchone()
         today_belief = belief_row["belief_text"] if belief_row else None
 
-        # Weekly summary data
+        # weekly summary data
         week_start = (date.today() - timedelta(days=6)).isoformat()
 
-        # Count active reflection days this week
+        # count active reflection days this week
         cur.execute(
             "SELECT COUNT(DISTINCT date(created_at)) as count "
             "FROM journal_entries WHERE user_id = %s AND date(created_at) BETWEEN %s AND %s",
@@ -3297,7 +3331,7 @@ def today():
         )
         active_days_this_week = cur.fetchone()['count']
 
-        # Count habits completed this week
+        # count habits completed this week
         cur.execute(
             "SELECT COUNT(*) as count FROM habit_completions hc "
             "JOIN habits h ON hc.habit_id = h.id "
@@ -3306,7 +3340,7 @@ def today():
         )
         habits_done_this_week = cur.fetchone()['count']
 
-        # Week days indicator (last 7 days) - OPTIMIZED: Single query instead of 7
+        # week days indicator (last 7 days) - oprimised: Single query instead of 7
         cur.execute(
             "SELECT DISTINCT date(created_at) as entry_date "
             "FROM journal_entries WHERE user_id = %s AND date(created_at) BETWEEN %s AND %s",
@@ -3329,12 +3363,12 @@ def today():
                 'is_today': day_str == today_str,
             })
 
-        # Calculate stats for celebration
+        # calculate stats for celebration
         total_habits = len(habits_rows)
         habits_completed_today = len(completed_habit_ids)
         all_habits_completed = (total_habits > 0 and habits_completed_today == total_habits)
 
-        # Weekly encouragement message
+        # weekly encouragement message
         weekly_message = None
         if active_days_this_week >= 5:
             weekly_message = "You're showing up consistently. That's powerful."
@@ -3390,12 +3424,12 @@ def today():
         active_days_this_week=active_days_this_week,
         habits_done_this_week=habits_done_this_week,
         weekly_message=weekly_message,
-        # Habit completion stats
+        # habit completion stats
         total_habits=total_habits,
         habits_completed_today=habits_completed_today,
         all_habits_completed=all_habits_completed,
         today_belief=today_belief,
-        # Win acknowledgment flags
+        # win acknowledgment flags
         todo_done=todo_done,
         habit_done=habit_done,
         step_done=step_done,
@@ -3413,7 +3447,7 @@ def week():
     today_obj = date.today()
     today_str = today_obj.isoformat()
 
-    # monday through sunday of the current week
+    # Monday through Sunday of the current week
     week_start_obj = today_obj - timedelta(days=today_obj.weekday())
     week_end_obj = week_start_obj + timedelta(days=6)
     week_start = week_start_obj.isoformat()
@@ -3459,7 +3493,7 @@ def week():
         # bucket step completions by date for quick lookup
         step_comps_by_date = {}
         for sc in week_step_comps:
-            d = sc['completed_date']
+            d = str(sc['completed_date'])
             if d not in step_comps_by_date:
                 step_comps_by_date[d] = set()
             step_comps_by_date[d].add(sc['step_id'])
@@ -3507,9 +3541,10 @@ def week():
         conn.close()
 
     # sort todos into buckets by date
+    # str() on all date keys so string lookups always match
     todos_by_date = {}
     for todo in all_week_todos:
-        d = todo['due_date']
+        d = str(todo['due_date'])
         if d not in todos_by_date:
             todos_by_date[d] = []
         todos_by_date[d].append(todo)
@@ -3517,15 +3552,16 @@ def week():
     # sort journal entries into buckets by date
     journals_by_date = {}
     for entry in week_journals:
-        d = entry['entry_date']
+        d = str(entry['entry_date'])
         if d not in journals_by_date:
             journals_by_date[d] = []
         journals_by_date[d].append(entry)
 
     # count habit completions per day
+    # str() because psycopg2 might return date objects instead of strings
     habits_by_date = {}
     for comp in week_habit_comps:
-        d = comp['comp_date']
+        d = str(comp['comp_date'])
         habits_by_date[d] = habits_by_date.get(d, 0) + 1
 
     # split steps into groups by frequency
@@ -3534,7 +3570,7 @@ def week():
     one_off_by_date = {}
     for s in week_goal_steps:
         if s['frequency'] == 'one-off' and s['due_date']:
-            d = s['due_date']
+            d = str(s['due_date'])
             if d not in one_off_by_date:
                 one_off_by_date[d] = []
             one_off_by_date[d].append(s)
@@ -3570,28 +3606,21 @@ def week():
         # figure out which steps go on this day
         completed_today = step_comps_by_date.get(day_str, set())
 
-        if day_date < today_obj:
-            # past days - only show one-off steps that were due then
-            day_steps = []
-            for s in one_off_by_date.get(day_str, []):
-                sc = dict(s)
-                sc['is_completed_today'] = bool(s['is_done'])
-                day_steps.append(sc)
-        else:
-            # today or future - show daily + weekly (for this day) + one-off
-            day_steps = []
-            for s in daily_steps:
-                sc = dict(s)
-                sc['is_completed_today'] = s['id'] in completed_today
-                day_steps.append(sc)
-            for s in weekly_by_dow.get(i, []):
-                sc = dict(s)
-                sc['is_completed_today'] = s['id'] in completed_today
-                day_steps.append(sc)
-            for s in one_off_by_date.get(day_str, []):
-                sc = dict(s)
-                sc['is_completed_today'] = False
-                day_steps.append(sc)
+        # show daily + weekly + one-off steps for every day in the week
+        # past days included so users can retrospectively tick things off
+        day_steps = []
+        for s in daily_steps:
+            sc = dict(s)
+            sc['is_completed_today'] = s['id'] in completed_today
+            day_steps.append(sc)
+        for s in weekly_by_dow.get(i, []):
+            sc = dict(s)
+            sc['is_completed_today'] = s['id'] in completed_today
+            day_steps.append(sc)
+        for s in one_off_by_date.get(day_str, []):
+            sc = dict(s)
+            sc['is_completed_today'] = bool(s['is_done']) if day_date < today_obj else False
+            day_steps.append(sc)
 
         week_days.append({
             'date': day_str,
@@ -3610,7 +3639,7 @@ def week():
     total_journal_entries = len(week_journals)
     total_habits_done = sum(d['habits_done'] for d in week_days)
 
-    # avg paralysis score for the week
+    # average paralysis score for the week
     week_scores = [j['paralysis_score'] for j in week_journals if j['paralysis_score'] is not None]
     week_avg_paralysis = round(sum(week_scores) / len(week_scores), 1) if week_scores else None
 
@@ -3758,7 +3787,7 @@ def month():
         # bucket step completions by date
         month_sc_by_date = {}
         for sc in month_step_comps:
-            d = sc['completed_date']
+            d = str(sc['completed_date'])
             if d not in month_sc_by_date:
                 month_sc_by_date[d] = set()
             month_sc_by_date[d].add(sc['step_id'])
@@ -3786,9 +3815,10 @@ def month():
         conn.close()
 
     # bucket journals by date
+    # str() on all date keys so string lookups always match
     journals_by_date = {}
     for entry in month_journals:
-        d = entry['entry_date']
+        d = str(entry['entry_date'])
         if d not in journals_by_date:
             journals_by_date[d] = []
         journals_by_date[d].append(entry)
@@ -3796,7 +3826,7 @@ def month():
     # bucket todos by date
     todos_by_date = {}
     for todo in month_todos:
-        d = todo['due_date']
+        d = str(todo['due_date'])
         if d not in todos_by_date:
             todos_by_date[d] = []
         todos_by_date[d].append(todo)
@@ -3804,7 +3834,7 @@ def month():
     # count habit completions per day
     habits_by_date = {}
     for comp in month_habit_comps:
-        d = comp['comp_date']
+        d = str(comp['comp_date'])
         habits_by_date[d] = habits_by_date.get(d, 0) + 1
 
     # split goal steps by type
@@ -3813,7 +3843,7 @@ def month():
     one_off_steps_by_date = {}
     for s in month_steps:
         if s['frequency'] == 'one-off' and s['due_date']:
-            d = s['due_date']
+            d = str(s['due_date'])
             if d not in one_off_steps_by_date:
                 one_off_steps_by_date[d] = []
             one_off_steps_by_date[d].append(s)
@@ -3857,27 +3887,21 @@ def month():
                 day_habits_done = habits_by_date.get(day_str, 0)
                 completed_today = month_sc_by_date.get(day_str, set())
 
-                # past days only get one-off steps, today/future get daily/weekly too
-                if is_past:
-                    day_steps = []
-                    for s in one_off_steps_by_date.get(day_str, []):
-                        sc = dict(s)
-                        sc['is_completed_today'] = bool(s['is_done'])
-                        day_steps.append(sc)
-                else:
-                    day_steps = []
-                    for s in month_daily_steps:
-                        sc = dict(s)
-                        sc['is_completed_today'] = s['id'] in completed_today
-                        day_steps.append(sc)
-                    for s in month_weekly_by_dow.get(day_dow, []):
-                        sc = dict(s)
-                        sc['is_completed_today'] = s['id'] in completed_today
-                        day_steps.append(sc)
-                    for s in one_off_steps_by_date.get(day_str, []):
-                        sc = dict(s)
-                        sc['is_completed_today'] = False
-                        day_steps.append(sc)
+                # show daily + weekly + one-off steps for every day
+                # past days included so users can retrospectively check things
+                day_steps = []
+                for s in month_daily_steps:
+                    sc = dict(s)
+                    sc['is_completed_today'] = s['id'] in completed_today
+                    day_steps.append(sc)
+                for s in month_weekly_by_dow.get(day_dow, []):
+                    sc = dict(s)
+                    sc['is_completed_today'] = s['id'] in completed_today
+                    day_steps.append(sc)
+                for s in one_off_steps_by_date.get(day_str, []):
+                    sc = dict(s)
+                    sc['is_completed_today'] = bool(s['is_done']) if is_past else False
+                    day_steps.append(sc)
 
                 # get unique emotions for the indicator dots
                 emotions = []
@@ -4009,7 +4033,7 @@ def month():
             return 'down'
         return 'same'
 
-    # for paralysis score, lower is better so we flip the direction
+    # for paralysis score lower is better so we flip the direction
     def compare_paralysis(current, previous):
         """for paralysis score lower is better, so down = good"""
         if current is None or previous is None:
@@ -4082,6 +4106,7 @@ def habits():
             conn = get_db_connection()
             cur = conn.cursor()
             now = datetime.now().isoformat(timespec="seconds")
+            today_str = date.today().isoformat()
 
             for hid in completed_ids:
                 try:
@@ -4095,6 +4120,15 @@ def habits():
                     (hid_int, user_id),
                 )
                 if cur.fetchone() is None:
+                    continue
+
+                # skip if already completed today so we don't make duplicates
+                cur.execute(
+                    "SELECT id FROM habit_completions "
+                    "WHERE habit_id = %s AND date(completed_at) = %s",
+                    (hid_int, today_str),
+                )
+                if cur.fetchone() is not None:
                     continue
 
                 cur.execute(
@@ -4120,10 +4154,21 @@ def habits():
         ORDER BY h.id ASC
     """, (user_id,))
     habits_rows = cur.fetchall()
+
+    # check which habits were already completed today so we can show them ticked
+    today_str = date.today().isoformat()
+    cur.execute(
+        "SELECT habit_id FROM habit_completions hc "
+        "JOIN habits h ON hc.habit_id = h.id "
+        "WHERE h.user_id = %s AND date(hc.completed_at) = %s",
+        (user_id, today_str),
+    )
+    completed_today = {row['habit_id'] for row in cur.fetchall()}
     conn.close()
 
     acknowledged = request.args.get("acknowledged") == "1"
-    return render_template("habits.html", habits=habits_rows, acknowledged=acknowledged)
+    return render_template("habits.html", habits=habits_rows,
+                           acknowledged=acknowledged, completed_today=completed_today)
 
 @app.route("/analytics")
 @login_required
@@ -4504,7 +4549,12 @@ def add_goal_step():
 def toggle_goal_step(step_id):
     """Toggle a goal step done or not done"""
     user_id = session['user_id']
-    today_str = date.today().isoformat()
+
+    # use the date from the form if provided, otherwise default to today
+    # this lets week/month views toggle steps for past or future days
+    target_date = request.form.get("completion_date", "")
+    if not target_date:
+        target_date = date.today().isoformat()
 
     conn = get_db_connection()
     try:
@@ -4527,20 +4577,20 @@ def toggle_goal_step(step_id):
             cur.execute(
                 "SELECT id FROM step_completions "
                 "WHERE step_id = %s AND user_id = %s AND completed_date = %s",
-                (step_id, user_id, today_str)
+                (step_id, user_id, target_date)
             )
             existing = cur.fetchone()
 
             if existing:
-                # already done today so undo it
+                # already done for that day so undo it
                 cur.execute("DELETE FROM step_completions WHERE id = %s", (existing['id'],))
                 was_done = True
             else:
-                # mark it done for today
+                # mark it done for that day
                 cur.execute(
                     "INSERT INTO step_completions (step_id, user_id, completed_date) "
                     "VALUES (%s, %s, %s)",
-                    (step_id, user_id, today_str)
+                    (step_id, user_id, target_date)
                 )
                 was_done = False
         else:
@@ -4711,9 +4761,12 @@ def onboarding_goals():
 
         if not goal_1 or not goal_2 or not goal_3:
             flash("Please enter all 3 goals.", "error")
-            return render_template("onboarding_goals.html", step=1, total_steps=5)
+            return render_template(
+                "onboarding_goals.html", step=1, total_steps=5,
+                existing_goals=[goal_1, goal_2, goal_3]
+            )
 
-        # Delete existing goals if any (allow re-doing this step)
+        # delete existing goals if any (allow re-doing this step)
         conn = get_db_connection()
         cur = conn.cursor()
         cur.execute("DELETE FROM goals WHERE user_id = %s", (user_id,))
@@ -4751,7 +4804,7 @@ def onboarding_beliefs():
     """Step 2: Rewrite goals as identity beliefs"""
     user_id = session['user_id']
 
-    # Load user's goals
+    # load user's goals
     conn = get_db_connection()
     cur = conn.cursor()
     cur.execute("SELECT id, goal_text FROM goals WHERE user_id = %s ORDER BY id ASC", (user_id,))
@@ -4774,7 +4827,7 @@ def onboarding_beliefs():
             flash("Please create an identity belief for each goal.", "error")
             return render_template("onboarding_beliefs.html", step=2, total_steps=5, goals=goals)
 
-        # Delete existing beliefs and insert new ones
+        # delete existing beliefs and insert new ones
         conn = get_db_connection()
         cur = conn.cursor()
         cur.execute("DELETE FROM identity_beliefs WHERE user_id = %s", (user_id,))
@@ -4816,7 +4869,7 @@ def onboarding_thoughts():
     """Step 3: Add positive thoughts linked to beliefs"""
     user_id = session['user_id']
 
-    # Load user's beliefs
+    # load user's beliefs
     conn = get_db_connection()
     cur = conn.cursor()
     cur.execute(
@@ -4842,7 +4895,7 @@ def onboarding_thoughts():
             flash("Please add at least one positive thought for each belief.", "error")
             return render_template("onboarding_thoughts.html", step=3, total_steps=5, beliefs=beliefs)
 
-        # Delete existing thoughts and insert new ones
+        # delete existing thoughts and insert new ones
         conn = get_db_connection()
         cur = conn.cursor()
         cur.execute("DELETE FROM positive_thoughts WHERE user_id = %s", (user_id,))
@@ -4884,7 +4937,7 @@ def onboarding_habits():
     """Step 4: Create small daily habits linked to goals"""
     user_id = session['user_id']
 
-    # Load user's goals
+    # load user's goals
     conn = get_db_connection()
     cur = conn.cursor()
     cur.execute("SELECT id, goal_text FROM goals WHERE user_id = %s ORDER BY id ASC", (user_id,))
@@ -4907,7 +4960,7 @@ def onboarding_habits():
             flash("Please create at least one habit for each goal.", "error")
             return render_template("onboarding_habits.html", step=4, total_steps=5, goals=goals)
 
-        # Delete existing custom habits (is_sample = 0) and insert new ones
+        # delete existing custom habits (is_sample = 0) and insert new ones
         conn = get_db_connection()
         cur = conn.cursor()
         cur.execute("DELETE FROM habits WHERE user_id = %s AND is_sample = 0", (user_id,))

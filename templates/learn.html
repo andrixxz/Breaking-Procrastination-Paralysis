@@ -22,12 +22,12 @@
 
     <!-- navigation -->
     <nav class="page-nav">
-        <a href="{{ url_for('dashboard') }}" class="nav-brand">Breaking Procrastination Paralysis</a>
+        <a href="{{ url_for('dashboard') }}" class="nav-brand"><svg class="nav-home-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg> Breaking Procrastination Paralysis</a>
         <ul class="nav-links">
             <li><a href="{{ url_for('today') }}">Today</a></li>
-            <li><a href="{{ url_for('journal') }}">Reflect</a></li>
-            <li><a href="{{ url_for('habits') }}">Tiny Steps</a></li>
-            <li><a href="{{ url_for('goals_page') }}">Intentions</a></li>
+            <li><a href="{{ url_for('journal') }}">Journal</a></li>
+            <li><a href="{{ url_for('habits') }}">Habits</a></li>
+            <li><a href="{{ url_for('goals_page') }}">Goals</a></li>
             <li><a href="{{ url_for('week') }}">Week</a></li>
             <li><a href="{{ url_for('month') }}">Month</a></li>
             <li><a href="{{ url_for('analytics') }}">Patterns</a></li>
@@ -208,7 +208,7 @@
                 <div class="learn-card-body" hidden>
                     <p>Procrastination is not about being lazy or bad at managing time. It is an emotional response. When a task feels overwhelming, boring, or tied to fear of failure, your brain triggers an avoidance response to protect you from discomfort. The part of your brain that processes threats (the amygdala) hijacks the part that plans and makes decisions (the prefrontal cortex). You are not choosing to avoid the task. Your nervous system is doing it for you.</p>
                     <p class="learn-card-link">This is why the app starts with how you feel, not what you need to do.</p>
-                    <p class="learn-card-citation">PLACEHOLDER FOR REFERENCES</p>
+                    <p class="learn-card-citation">Based on Sirois & Pychyl [20]</p>
                 </div>
             </div>
 
@@ -222,7 +222,7 @@
                 <div class="learn-card-body" hidden>
                     <p>When you sit down to work and feel that wave of paralysis, that is your fight-or-flight system activating. Your amygdala detects the task as a threat and floods your body with stress hormones. Your prefrontal cortex (the part responsible for planning, focus, and decision-making) goes offline. You are not thinking clearly because your brain has literally shifted into survival mode. The freeze response is the third option after fight or flight. You are not broken. Your brain is trying to keep you safe.</p>
                     <p class="learn-card-link">This is why the breathing prompt appears before the journal. A slow breath activates your parasympathetic nervous system, which calms the stress response and brings your prefrontal cortex back online.</p>
-                    <p class="learn-card-citation">PLACEHOLDER FOR REFERENCES</p>
+                    <p class="learn-card-citation">Based on Sirois & Pychyl [20]</p>
                 </div>
             </div>
 
@@ -236,7 +236,7 @@
                 <div class="learn-card-body" hidden>
                     <p>Most habit systems start with goals: "I want to exercise three times a week." But goals describe outcomes, not who you are. Identity-based habit formation flips this. Instead of "I want to exercise," you start with "I am someone who moves their body." When you believe something about yourself, you naturally act in ways that match that belief. Every tiny action you complete becomes evidence that this new belief is true. Over time, the belief becomes automatic.</p>
                     <p class="learn-card-link">This is why onboarding asks you to rewrite your intentions as "I am" statements. The app turns every completed action into identity evidence.</p>
-                    <p class="learn-card-citation">PLACEHOLDER FOR REFERENCES</p>
+                    <p class="learn-card-citation">Based on Alfrey et al. [16] and Zhu et al. [17]</p>
                 </div>
             </div>
 
@@ -250,7 +250,7 @@
                 <div class="learn-card-body" hidden>
                     <p>Your brain processes millions of bits of information every second, but you can only be aware of a tiny fraction. The reticular activating system (RAS) acts like a filter, deciding what gets through. It prioritises information that matches your existing beliefs. If you believe "I never finish things," your brain will notice every unfinished task and ignore every time you did follow through. This is called confirmation bias. The good news is that it works both ways. If you start telling yourself "I am someone who starts tasks gently," your RAS will begin filtering for evidence that supports that instead.</p>
                     <p class="learn-card-link">This is why the dashboard shows you a daily identity reminder. Repeated exposure trains your RAS to look for evidence that your new belief is true.</p>
-                    <p class="learn-card-citation">PLACEHOLDER FOR REFERENCES</p>
+                    <p class="learn-card-citation">Based on Sutil-Mart&iacute;n & Rienda-G&oacute;mez [18]</p>
                 </div>
             </div>
 
@@ -264,7 +264,7 @@
                 <div class="learn-card-body" hidden>
                     <p>Your brain is not fixed. Every time you repeat an action, the neural pathway for that action gets stronger. This is neuroplasticity. Think of it like walking through a field of tall grass. The first time, you have to push through. The tenth time, there is a visible trail. The hundredth time, it is a clear path. Each day you show up and journal, complete a tiny action, or check in with how you are feeling, you are strengthening the pathway for that behaviour. It gets easier not because the task changed but because your brain changed.</p>
                     <p class="learn-card-link">This is why the app tracks consecutive days of showing up. Each day is a rep that makes the new pathway stronger.</p>
-                    <p class="learn-card-citation">PLACEHOLDER FOR REFERENCES</p>
+                    <p class="learn-card-citation">Based on &Ouml;ner [22]</p>
                 </div>
             </div>
 
@@ -278,7 +278,7 @@
                 <div class="learn-card-body" hidden>
                     <p>When you are stuck, your thoughts often follow distorted patterns. "I will never finish this" (all-or-nothing thinking). "Everyone else finds this easy" (comparison). "If I cannot do it perfectly, why bother" (perfectionism). These thought patterns feel like facts, but they are not. Cognitive reframing is a technique from cognitive behavioural therapy (CBT) that gently challenges the distortion and offers a more balanced perspective. It does not dismiss how you feel. It acknowledges the emotion first, then shows you that the thought behind it might not be the full picture.</p>
                     <p class="learn-card-link">This is why the reframe after a journal entry always starts by naming what you are feeling before offering a different way to look at it.</p>
-                    <p class="learn-card-citation">PLACEHOLDER FOR REFERENCES</p>
+                    <p class="learn-card-citation">Based on principles of cognitive behavioural therapy (CBT)</p>
                 </div>
             </div>
 
@@ -292,7 +292,7 @@
                 <div class="learn-card-body" hidden>
                     <p>When your brain is in freeze mode, it perceives big tasks as threats. Telling yourself to "write the whole essay" triggers the same avoidance response that caused the paralysis in the first place. But "open the document" does not. Tiny actions work because they are small enough that your brain does not register them as dangerous. Once you start, momentum often carries you further than you expected. Behavioural activation (a technique from clinical psychology) is based on this exact principle: action comes before motivation, not the other way around.</p>
                     <p class="learn-card-link">This is why the app gives you one small action, never a list. The goal is to get you moving, not to plan the whole journey.</p>
-                    <p class="learn-card-citation">PLACEHOLDER FOR REFERENCES</p>
+                    <p class="learn-card-citation">Based on Gardner et al. [23]</p>
                 </div>
             </div>
 
@@ -306,7 +306,7 @@
                 <div class="learn-card-body" hidden>
                     <p>Every decision you make uses mental energy. The more decisions you make in a day, the worse your subsequent decisions become. This is called decision fatigue. When someone who struggles with procrastination has to switch between a journal app, a todo app, a habit tracker, a calendar, and a mindfulness app, each switch costs energy. The act of deciding which tool to open can itself trigger avoidance. A single unified system removes that friction entirely. You open one app and everything is there.</p>
                     <p class="learn-card-link">This is why this app combines journaling, habits, todos, intentions, and planning in one place. Fewer decisions means less friction.</p>
-                    <p class="learn-card-citation">PLACEHOLDER FOR REFERENCES</p>
+                    <p class="learn-card-citation">Based on decision fatigue research in cognitive psychology</p>
                 </div>
             </div>
 
@@ -320,7 +320,7 @@
                 <div class="learn-card-body" hidden>
                     <p>Self-efficacy is the belief that you can do something. It is different from self-esteem (believing you are worth something) and different from motivation (wanting to do something). The strongest way to build self-efficacy is through mastery experiences: actually doing the thing and succeeding. But the thing has to be small enough that success is realistic. Each time you complete a tiny action and the app names it as a win, your brain stores that as evidence. "I did it once, so I can do it again." Over time, these small wins stack up and your self-belief shifts.</p>
                     <p class="learn-card-link">This is why the app says "That is evidence of who you are becoming" instead of "Great job." The win is framed as identity evidence, not just task completion.</p>
-                    <p class="learn-card-citation">PLACEHOLDER FOR REFERENCES</p>
+                    <p class="learn-card-citation">Based on Ouyang et al. [21] and Bandura's self-efficacy theory</p>
                 </div>
             </div>
 
@@ -334,7 +334,7 @@
                 <div class="learn-card-body" hidden>
                     <p>When you put a feeling into words, something measurable happens in your brain. fMRI studies show that labelling an emotion in language reduces activation in the amygdala (the brain's threat detector) and increases activation in the prefrontal cortex (the brain's planning centre). This is called affect labelling. You do not need to analyse the feeling or solve it. Just naming it is enough to take some of its power away. The emotion does not disappear, but it becomes easier to sit with.</p>
                     <p class="learn-card-link">This is why the app says "It sounds like you might be feeling..." after you journal. The ML model names the emotion so your brain can start processing it.</p>
-                    <p class="learn-card-citation">PLACEHOLDER FOR REFERENCES</p>
+                    <p class="learn-card-citation">Based on Lindsay et al. [24]</p>
                 </div>
             </div>
 
@@ -348,7 +348,7 @@
                 <div class="learn-card-body" hidden>
                     <p>Motivation is unreliable. It comes and goes based on mood, sleep, stress, and a hundred other things you cannot control. Most productivity apps are designed for people who already have motivation and just need to organise it. But if you are stuck in procrastination paralysis, motivation is exactly what is missing. Telling someone who is frozen to "just get motivated" is like telling someone with a broken leg to "just walk." This app does not try to motivate you. It helps you feel safe enough to take one small step. Action creates motivation, not the other way around.</p>
                     <p class="learn-card-link">This is why the app never uses words like "push through" or "stay motivated." The tone is always gentle because pressure makes paralysis worse.</p>
-                    <p class="learn-card-citation">PLACEHOLDER FOR REFERENCES</p>
+                    <p class="learn-card-citation">Based on Xu [25] and Sirois & Pychyl [20]</p>
                 </div>
             </div>
 
@@ -362,7 +362,7 @@
                 <div class="learn-card-body" hidden>
                     <p>When you write "I am someone who starts tasks gently" but your brain screams "No you are not," that is completely normal. Your subconscious has spent years building a version of who you are based on past experiences. A new identity belief conflicts with that existing model, and the brain resists unfamiliar patterns. This is not a sign that the belief is wrong. It is a sign that it is new. Each time you act in a way that matches the new belief (even something tiny), your brain updates its model slightly. The discomfort fades as the new belief becomes familiar through repetition.</p>
                     <p class="learn-card-link">This is why onboarding tells you that resistance is normal. The app does not pretend this is easy. It just keeps showing you evidence that the new belief is becoming true.</p>
-                    <p class="learn-card-citation">PLACEHOLDER FOR REFERENCES</p>
+                    <p class="learn-card-citation">Based on Sutil-Mart&iacute;n & Rienda-G&oacute;mez [18]</p>
                 </div>
             </div>
 

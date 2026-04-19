@@ -134,7 +134,7 @@ with client.session_transaction() as sess:
     sess['username'] = 'summarytest99'
 
 
-# ===== GROUP 1: WEEK PAGE - NO DATA =====
+# ===== GROUP 1: Week Page - No Data =====
 print("GROUP 1: Week page with no journal data")
 clear_entries()
 resp = client.get('/week')
@@ -147,7 +147,7 @@ check("No positive shifts shown when no data", "Positive shifts" not in html)
 check("Reflections this week label present", "Reflections this week" in html)
 print()
 
-# ===== GROUP 2: WEEK PAGE - WITH EMOTION DATA =====
+# ===== GROUP 2: Week Page - With Emotion Data =====
 print("GROUP 2: Week page with emotion data (all today so definitely in this week)")
 clear_entries()
 # all entries on today so they are always in the current week
@@ -167,7 +167,7 @@ check("Top emotion badge has class", 'emotion-badge anxious' in html)
 check("Psych explainer present", "Why these numbers matter" in html)
 print()
 
-# ===== GROUP 3: WEEK PAGE - POSITIVE SHIFTS =====
+# ===== GROUP 3: Week Page - Positive Shifts =====
 print("GROUP 3: Week page positive shifts detection")
 clear_entries()
 # two entries same day: Avoidance then Action = 1 positive shift
@@ -181,7 +181,7 @@ check("Positive shifts shown", "Positive shifts" in html)
 check("Positive shifts count is 1", ">1</p>" in html and "Positive shifts" in html)
 print()
 
-# ===== GROUP 4: NO SHIFTS WHEN ENTRIES ON DIFFERENT DAYS =====
+# ===== GROUP 4: No shifts when entries are on different days =====
 print("GROUP 4: No shifts when entries are on different days")
 clear_entries()
 # one entry today, one entry yesterday - both in the current week but on different days
@@ -202,7 +202,7 @@ html = resp.data.decode()
 check("No positive shifts across different days (or neg-to-neg same day)", "Positive shifts</p>" not in html)
 print()
 
-# ===== GROUP 5: WEEK PAGE - NULL BEHAVIOURS =====
+# ===== GROUP 5: Week page - NULL behaviours =====
 print("GROUP 5: Week page handles NULL behaviours gracefully")
 clear_entries()
 add_entry("anxious", None, 3, days_ago=0)
@@ -219,7 +219,7 @@ check("Top emotion still shown with NULL behaviours", "Most felt this week" in h
 check("No shifts when all behaviours are NULL", "Positive shifts</p>" not in html)
 print()
 
-# ===== GROUP 6: WEEK PAGE - NULL PARALYSIS SCORES =====
+# ===== GROUP 6: Week page - NULL paralysis scores =====
 print("GROUP 6: Week page handles NULL paralysis scores")
 clear_entries()
 add_entry("anxious", "Avoidance", None, days_ago=0)
@@ -231,7 +231,7 @@ check("Page loads with NULL scores", resp.status_code == 200)
 check("No avg paralysis when all scores NULL", "Avg. paralysis score" not in html)
 print()
 
-# ===== GROUP 7: OLD ENTRIES EXCLUDED =====
+# ===== GROUP 7: Old entries excluded =====
 print("GROUP 7: Old entries excluded from weekly summary")
 clear_entries()
 # 10 days ago is definitely not in the current week
@@ -245,7 +245,7 @@ check("Only this week entries counted", "Reflections this week" in html)
 check("Top emotion is calm (not stressed from 10 days ago)", 'emotion-badge calm' in html)
 print()
 
-# ===== GROUP 8: MONTH PAGE - NO DATA =====
+# ===== GROUP 8: Month page - no data =====
 print("GROUP 8: Month page with no journal data")
 clear_entries()
 resp = client.get('/month')
@@ -256,7 +256,7 @@ check("No top emotion on month when no data", "Most felt this month" not in html
 check("No positive shifts on month when no data", "Positive shifts" not in html)
 print()
 
-# ===== GROUP 9: MONTH PAGE - WITH DATA =====
+# ===== GROUP 9: Month page with data =====
 print("GROUP 9: Month page with emotion and behaviour data")
 clear_entries()
 add_entry("anxious", "Avoidance", 3, days_ago=0)
@@ -273,7 +273,7 @@ check("Emotion badge on month page", 'emotion-badge anxious' in html)
 check("Avg paralysis shown on month", "Avg. paralysis score" in html)
 print()
 
-# ===== GROUP 10: MONTH PAGE - POSITIVE SHIFTS =====
+# ===== GROUP 10: Month page - positive shifts =====
 print("GROUP 10: Month page positive shifts")
 clear_entries()
 add_entry_at_time("anxious", "Avoidance", 3, days_ago=0, hour=9)
@@ -288,7 +288,7 @@ check("Positive shifts shown on month", "Positive shifts" in html)
 check("Two positive shifts detected", ">2</p>" in html and "Positive shifts" in html)
 print()
 
-# ===== GROUP 11: MONTH - PREVIOUS MONTH COMPARISON =====
+# ===== GROUP 11: Month - Previous month comparison =====
 print("GROUP 11: Previous month comparison")
 clear_entries()
 # add entries for THIS month
@@ -325,7 +325,7 @@ check("Comparison text appears", "from" in html.lower() or "same as last month" 
 check("Psych explainer for month stats", "Why these numbers matter" in html)
 print()
 
-# ===== GROUP 12: NO PREVIOUS MONTH DATA =====
+# ===== GROUP 12: No previous month Data =====
 print("GROUP 12: No previous month comparison when no prior data")
 clear_entries()
 add_entry("calm", "Action", -1, days_ago=0)
@@ -337,7 +337,7 @@ check("Month loads without prior data", resp.status_code == 200)
 check("No comparison when prev month empty", "up from" not in html and "down from" not in html)
 print()
 
-# ===== GROUP 13: ALL ENTRIES SAME EMOTION =====
+# ===== GROUP 13: All entries same emotion =====
 print("GROUP 13: All entries have the same emotion")
 clear_entries()
 add_entry("anxious", "Avoidance", 3, days_ago=0)
@@ -352,7 +352,7 @@ html = resp.data.decode()
 check("Top emotion is anxious when all entries anxious", 'emotion-badge anxious' in html)
 print()
 
-# ===== GROUP 14: SINGLE ENTRY =====
+# ===== GROUP 14: Single entry =====
 print("GROUP 14: Single entry only")
 clear_entries()
 add_entry("calm", "Action", -2, days_ago=0)
@@ -365,7 +365,7 @@ check("Avg paralysis shown with single entry", "Avg. paralysis score" in html)
 check("No shifts with single entry (only 1 entry total)", "Positive shifts</p>" not in html)
 print()
 
-# ===== GROUP 15: MIXED NULL AND VALID DATA =====
+# ===== GROUP 15: Mixed NULL and valid Data =====
 print("GROUP 15: Mix of NULL and valid behaviour/score data")
 clear_entries()
 # all entries have emotion (NOT NULL constraint), but behaviour and score can be null
@@ -381,7 +381,7 @@ check("Top emotion from non-null entries", "Most felt this week" in html)
 check("Avg paralysis from non-null scores only", "Avg. paralysis score" in html)
 print()
 
-# ===== GROUP 16: MONTH NAVIGATION =====
+# ===== GROUP 16: Month navigation =====
 print("GROUP 16: Month navigation with summary stats")
 clear_entries()
 resp = client.get(f'/month?year={today.year}&month={today.month}')
@@ -390,7 +390,7 @@ html = resp.data.decode()
 check("Month nav loads with year/month params", resp.status_code == 200)
 print()
 
-# ===== GROUP 17: MULTIPLE SHIFTS SAME DAY =====
+# ===== GROUP 17: Multiple shifts same day =====
 print("GROUP 17: Multiple positive shifts in one day")
 clear_entries()
 # Avoidance -> Action -> Overwhelm -> Completion = 2 positive shifts
@@ -419,7 +419,7 @@ html = resp.data.decode()
 check("No shift for negative to negative", "Positive shifts</p>" not in html)
 print()
 
-# ===== GROUP 19: POSITIVE TO POSITIVE NOT A SHIFT =====
+# ===== GROUP 19: Positive to positive not a shift =====
 print("GROUP 19: Positive to positive is not a shift")
 clear_entries()
 add_entry_at_time("calm", "Action", -1, days_ago=0, hour=9)
@@ -431,7 +431,7 @@ html = resp.data.decode()
 check("No shift for positive to positive", "Positive shifts</p>" not in html)
 print()
 
-# ===== GROUP 20: PARALYSIS COMPARISON - IMPROVED =====
+# ===== GROUP 20: Paralysis score - improved =====
 print("GROUP 20: Paralysis score improved compared to last month")
 clear_entries()
 # this month: low paralysis
@@ -462,7 +462,7 @@ check("Score improved message shows", "that is progress" in html.lower() or "dow
 print()
 
 
-# ===== CLEANUP =====
+# ===== Cleanup =====
 print("\n--- CLEANUP ---")
 clear_entries()
 c = get_db_connection()

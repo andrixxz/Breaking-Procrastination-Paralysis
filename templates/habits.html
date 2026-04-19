@@ -22,12 +22,12 @@
 
     <!-- navigation -->
     <nav class="page-nav">
-        <a href="{{ url_for('dashboard') }}" class="nav-brand">Breaking Procrastination Paralysis</a>
+        <a href="{{ url_for('dashboard') }}" class="nav-brand"><svg class="nav-home-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg> Breaking Procrastination Paralysis</a>
         <ul class="nav-links">
             <li><a href="{{ url_for('today') }}">Today</a></li>
-            <li><a href="{{ url_for('journal') }}">Reflect</a></li>
-            <li><a href="{{ url_for('habits') }}" class="active">Tiny Steps</a></li>
-            <li><a href="{{ url_for('goals_page') }}">Intentions</a></li>
+            <li><a href="{{ url_for('journal') }}">Journal</a></li>
+            <li><a href="{{ url_for('habits') }}" class="active">Habits</a></li>
+            <li><a href="{{ url_for('goals_page') }}">Goals</a></li>
             <li><a href="{{ url_for('week') }}">Week</a></li>
             <li><a href="{{ url_for('month') }}">Month</a></li>
             <li><a href="{{ url_for('analytics') }}">Patterns</a></li>
@@ -61,8 +61,11 @@
         {% endif %}
 
         <!-- today's habits -->
-        <form method="post" class="fade-in-up">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+        <div class="fade-in-up">
+            <form method="post" id="habits-form">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            </form>
+
             <h2>Today's gentle reminders</h2>
 
             {% if habits %}
@@ -75,6 +78,8 @@
                         name="completed_habits"
                         value="{{ h['id'] }}"
                         id="habit-{{ h['id'] }}"
+                        form="habits-form"
+                        {% if h['id'] in completed_today %}checked disabled{% endif %}
                     >
                     <label class="habit-label" for="habit-{{ h['id'] }}">
                         <span class="habit-name-text">{{ h["name"] }}</span>
@@ -99,7 +104,7 @@
                 </li>
                 {% endfor %}
             </ul>
-            <button type="submit" class="btn-calm">Acknowledge progress</button>
+            <button type="submit" form="habits-form" class="btn-calm">Acknowledge progress</button>
             {% else %}
             <div class="empty-state-enhanced">
                 <div class="empty-state-icon">🌱</div>
@@ -107,7 +112,7 @@
                 <p style="margin-top: 8px; font-size: 0.85rem;">Add one below when you feel ready. It can be something very small.</p>
             </div>
             {% endif %}
-        </form>
+        </div>
 
         <hr class="divider">
 

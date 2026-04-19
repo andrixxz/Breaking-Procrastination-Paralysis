@@ -1,12 +1,12 @@
 # setup_rls.py
 # turns on row-level security for all data tables in supabase
 # run this once after migrate_to_postgres.py has created the tables
-#
+
 # how it works:
 # - the flask app sets a postgres session variable (app.current_user_id) on each connection
 # - RLS policies check that variable to only let users see their own data
 # - even if there is a bug in the flask code, the database itself blocks data leakage
-#
+
 # users table is excluded because login/signup need to query it
 # before we know who the user is
 
@@ -89,7 +89,7 @@ for table in STANDARD_TABLES:
     cur.execute(f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY;")
 
     # force it to apply even for the postgres superuser role
-    # without this, the postgres role bypasses all policies
+    # without this the postgres role bypasses all policies
     cur.execute(f"ALTER TABLE {table} FORCE ROW LEVEL SECURITY;")
 
     # clear out any old policies first

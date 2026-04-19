@@ -16,12 +16,12 @@
 <div class="page-wrapper">
 
     <nav class="page-nav">
-        <a href="{{ url_for('dashboard') }}" class="nav-brand">Breaking Procrastination Paralysis</a>
+        <a href="{{ url_for('dashboard') }}" class="nav-brand"><svg class="nav-home-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg> Breaking Procrastination Paralysis</a>
         <ul class="nav-links">
             <li><a href="{{ url_for('today') }}" class="active">Today</a></li>
-            <li><a href="{{ url_for('journal') }}">Reflect</a></li>
-            <li><a href="{{ url_for('habits') }}">Tiny Steps</a></li>
-            <li><a href="{{ url_for('goals_page') }}">Intentions</a></li>
+            <li><a href="{{ url_for('journal') }}">Journal</a></li>
+            <li><a href="{{ url_for('habits') }}">Habits</a></li>
+            <li><a href="{{ url_for('goals_page') }}">Goals</a></li>
             <li><a href="{{ url_for('week') }}">Week</a></li>
             <li><a href="{{ url_for('month') }}">Month</a></li>
             <li><a href="{{ url_for('analytics') }}">Patterns</a></li>
@@ -104,6 +104,12 @@
         </div>
         {% endif %}
 
+        {% if request.args.get('future_task_saved') %}
+        <div class="card fade-in-up" style="text-align: center; padding: 16px;">
+            <p style="color: var(--text-secondary); margin: 0;">Task saved for {{ request.args.get('future_task_saved')|format_date }}. It will show up when that day arrives.</p>
+        </div>
+        {% endif %}
+
         <!-- weekly summary card -->
         {% if show_weekly_summary %}
         <div class="weekly-summary">
@@ -179,12 +185,12 @@
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                         <input type="hidden" name="redirect" value="today">
                         {% if step['is_completed_today'] %}
-                        <button type="submit" class="habit-checkbox checked" style="border: none; cursor: pointer;">
+                        <button type="submit" class="habit-checkbox checked" style="cursor: pointer;">
                             <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7L5.5 10.5L12 3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
                         </button>
                         <span class="habit-label" style="text-decoration: line-through; opacity: 0.6;">
                         {% else %}
-                        <button type="submit" class="habit-checkbox" style="border: none; cursor: pointer;"></button>
+                        <button type="submit" class="habit-checkbox" style="cursor: pointer;"></button>
                         <span class="habit-label">
                         {% endif %}
                             {{ step['step_text'] }}
@@ -201,7 +207,7 @@
                     <p class="step-goal-context">{{ step['goal_text'] }}</p>
                     {% if step['frequency'] == 'one-off' and step['due_date'] and step['due_date'] < today_str %}
                     <p class="overdue-message">
-                        This was planned for {{ step['due_date'] }}. No pressure - you can do it today or
+                        This was planned for {{ step['due_date']|format_date }}. No pressure - you can do it today or
                         <a href="{{ url_for('goals_page') }}">reschedule</a>.
                     </p>
                     {% endif %}
@@ -227,7 +233,7 @@
                 <li class="habit-item">
                     <form method="post" action="{{ url_for('toggle_todo', todo_id=todo['id']) }}" style="display: flex; align-items: center; gap: 12px; width: 100%;">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                        <button type="submit" class="habit-checkbox" style="border: none; cursor: pointer;"></button>
+                        <button type="submit" class="habit-checkbox" style="cursor: pointer;"></button>
                         <span class="habit-label">
                             {{ todo['text'] }}
                             {% if todo['source'] == 'journal' %}
@@ -239,7 +245,7 @@
                                 {% if todo['due_date'] < today_str %}
                                     <span class="source-badge overdue">overdue</span>
                                 {% else %}
-                                    <span class="source-badge due">due {{ todo['due_date'] }}</span>
+                                    <span class="source-badge due">due {{ todo['due_date']|format_date }}</span>
                                 {% endif %}
                             {% endif %}
                         </span>
@@ -269,7 +275,7 @@
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                 <div class="add-habit-wrapper">
                     <input type="text" name="todo_text" placeholder="Add a task for today...">
-                    <input type="date" name="due_date" style="max-width: 160px;">
+                    <input type="date" name="due_date" value="{{ today_str }}" style="max-width: 160px;">
                     <button class="btn-gentle" type="submit">Add</button>
                 </div>
             </form>

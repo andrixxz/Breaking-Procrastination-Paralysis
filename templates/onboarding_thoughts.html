@@ -15,6 +15,10 @@
 <body>
 <div class="page-wrapper">
 
+    <div style="text-align: right; padding: 16px 24px 0;">
+        <a href="{{ url_for('logout') }}" style="font-size: 0.8rem; color: var(--text-muted); text-decoration: none;">Log out</a>
+    </div>
+
     <main class="page-content" style="max-width: 700px; margin: 0 auto; padding-top: 60px;">
 
         <!-- Progress Indicator -->
@@ -30,9 +34,24 @@
         <div class="section-header fade-in-up">
             <h1 class="section-title">Add supportive thoughts</h1>
             <p class="section-subtitle">
-                For each belief, add a positive thought that supports it.<br>
-                These will be your daily affirmations.
+                For each identity belief, add a positive thought that supports it.<br>
+                These will show up as your daily affirmations.
             </p>
+
+            <div class="card" style="margin-top: 20px; margin-bottom: 20px; padding: 20px; background: rgba(139, 195, 148, 0.06); border-left: 3px solid var(--sage-green);">
+                <p style="font-weight: 500; margin-bottom: 10px; color: var(--text-primary); font-size: 0.92rem;">How is this different from identity beliefs?</p>
+                <ul style="color: var(--text-secondary); font-size: 0.85rem; line-height: 1.8; padding-left: 18px; margin: 0 0 14px 0;">
+                    <li><strong>Identity belief</strong> = who you are becoming. ("I am someone who...")</li>
+                    <li><strong>Positive thought</strong> = what you say to yourself on hard days. A kind reminder in your own voice. Say these to yourself when doubt or discouraging thoughts show up.</li>
+                </ul>
+                <p style="font-weight: 500; margin-bottom: 8px; color: var(--text-primary); font-size: 0.88rem;">Examples:</p>
+                <ul style="color: var(--text-secondary); font-size: 0.85rem; line-height: 1.8; padding-left: 18px; margin: 0;">
+                    <li>Belief: "I am someone who follows through." → Thought: "I do not have to finish everything today. I just have to start."</li>
+                    <li>Belief: "I am someone who moves their body." → Thought: "Even five minutes counts. Movement is movement."</li>
+                    <li>Belief: "I am someone who makes time for learning." → Thought: "One page is still progress. Small steps add up."</li>
+                </ul>
+            </div>
+
             <details class="psych-explainer">
                 <summary>Why this works</summary>
                 <p>Supportive thoughts written in your own words bypass the resistance your brain puts up against generic advice. These are yours, so they feel true.</p>

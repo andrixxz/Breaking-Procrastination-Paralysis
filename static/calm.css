@@ -1,18 +1,18 @@
 /* ============================================
    Breaking Procrastination Paralysis
-   Design System — Emotionally Grounded UI
+   calm.css - main stylesheet for the app
    ============================================ */
 
 /* --- Custom Properties --- */
 :root {
-    /* Primary — emotional grounding (BOOSTED saturation & contrast) */
+    /* Primary - emotional grounding (boosted saturation and contrast) */
     --sage-green: #7FA372;
     --sage-green-dark: #5D8A52;
     --sage-green-light: #A4C497;
     --warm-sand: #E0C9B0;
     --soft-lavender: #A8AADB;
 
-    /* Accent — gentle encouragement (MORE VIBRANT) */
+    /* Accent - gentle encouragement (more vibrant) */
     --blush-pink: #F4A5A8;
     --blush-pink-light: #FFD4D6;
     --cream: #FFF9F0;
@@ -24,12 +24,12 @@
     --bg-secondary: #F5EDEF;
     --bg-card: #FFFFFF;
 
-    /* Emotional states (MUCH MORE VIBRANT & DISTINCT) */
+    /* Emotional states (made them much more vibrant and distinct) */
     --awareness-blue: #6BA3D0;
     --alignment-gold: #D4AF6A;
     --action-green: #7FA372;
 
-    /* Emotion-specific colors (inspired by Daylio/How We Feel) */
+    /* Emotion-specific colours */
     --emotion-overwhelmed: #E57373;
     --emotion-anxious: #BA68C8;
     --emotion-stuck: #FFA726;
@@ -159,6 +159,15 @@ a:hover {
     color: var(--text-primary);
     letter-spacing: 0.3px;
     text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.nav-home-icon {
+    opacity: 0.7;
+    flex-shrink: 0;
+    vertical-align: middle;
 }
 
 .nav-links {
@@ -817,7 +826,7 @@ input::placeholder {
     }
 }
 
-/* --- Emotion Badge (VIBRANT & DISTINCT - inspired by Daylio/How We Feel) --- */
+/* --- Emotion Badge (vibrant and distinct) --- */
 .emotion-badge {
     display: inline-block;
     padding: 4px 12px;
@@ -1396,7 +1405,7 @@ input::placeholder {
 
 /* --- Streak Display --- */
 
-/* Awareness streak counter — neuroplasticity tracking, not gamification */
+/* awareness streak counter - neuroplasticity tracking */
 .streak-display {
     display: inline-flex;
     align-items: center;
@@ -2529,7 +2538,7 @@ input::placeholder {
 
 
 /* ============================================
-   New Component Styles — Identity, Beliefs, Next Steps
+   New Component Styles - Identity, Beliefs, Next Steps
    ============================================ */
 
 /* --- Identity Section (Dashboard) --- */
@@ -2916,6 +2925,9 @@ input::placeholder {
     user-select: none;
     padding: 3px 8px 3px 4px;
     border-radius: var(--radius-sm, 6px);
+    text-decoration: underline dotted;
+    text-decoration-color: var(--sage-green-dark, #5a7a5a);
+    text-underline-offset: 3px;
 }
 
 /* small (i) circle before the text */
@@ -3083,7 +3095,7 @@ input::placeholder {
     color: var(--text-muted, #999);
 }
 
-/* Small inline badge for past entries */
+/* small inline badge for past entries */
 .paralysis-badge {
     display: inline-block;
     font-size: 0.7rem;
@@ -3096,7 +3108,7 @@ input::placeholder {
 }
 
 /* -- Daily Insight Card (Temporal Analysis, Task 2.5) -- */
-/* Shows emotional transitions detected across same-day journal entries */
+/* shows emotional transitions detected across same-day journal entries */
 
 .daily-insight {
     background: var(--cream, #FAF9F6);
@@ -3122,19 +3134,19 @@ input::placeholder {
     margin: 0;
 }
 
-/* Positive transition or improvement detected */
+/* positive transition or improvement detected */
 .daily-insight.insight-positive {
     border-left-color: var(--sage-green, #7C9A82);
     background: rgba(124, 154, 130, 0.06);
 }
 
-/* Negative loop detected - gentle, not alarming */
+/* negative loop detected - gentle, not alarming */
 .daily-insight.insight-loop {
     border-left-color: var(--emotion-unmotivated, #90A4AE);
     background: rgba(144, 164, 174, 0.06);
 }
 
-/* Neutral or general insight */
+/* neutral or general insight */
 .daily-insight.insight-neutral {
     border-left-color: var(--text-muted, #999);
     background: rgba(0, 0, 0, 0.02);
@@ -3828,8 +3840,8 @@ input::placeholder {
     width: 20px;
     height: 20px;
     border-radius: 50%;
-    border: 2px solid rgba(0, 0, 0, 0.15);
-    background: none;
+    border: 2px solid var(--warm-sand);
+    background: var(--bg-card);
     cursor: pointer;
     padding: 0;
     transition: border-color 0.2s, background 0.2s;
@@ -4393,7 +4405,7 @@ input::placeholder {
     margin: 0 12px;
 }
 
-/* 3-column grouped layout for the feature map */
+/* 3 column grouped layout for the feature map */
 .learn-map-groups {
     display: grid;
     grid-template-columns: 1fr 1fr 1fr;
